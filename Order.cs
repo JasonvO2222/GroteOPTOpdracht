@@ -22,7 +22,8 @@ namespace GroteOPTOpdracht
             string[] results = line.Split(';');
             this.orderId = int.Parse(results[0]);
             this.place = results[1];
-            this.frequency = int.Parse(results[2]);
+            string freq = results[2].Substring(0, 1);
+            this.frequency = int.Parse(freq);
             this.containerCount = int.Parse(results[3]);
             this.containerVolume = int.Parse(results[4]);
             this.loadingTime = float.Parse(results[5]);
