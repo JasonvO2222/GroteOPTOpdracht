@@ -1,4 +1,6 @@
 ﻿
+using System.Collections.Generic;
+
 namespace GroteOPTOpdracht
 {
     public class Program
@@ -15,6 +17,7 @@ namespace GroteOPTOpdracht
             string line = afstanden.ReadLine();
             line = afstanden.ReadLine();
 
+            // fill distance/duration matrix
             while (line != null) {
                 string[] splt = line.Split(';');
                 int i = int.Parse(splt[0]);
@@ -28,13 +31,16 @@ namespace GroteOPTOpdracht
             line = orders.ReadLine();
             line = orders.ReadLine();
 
+            // create order objects for each order
             while (line != null) {
                 Order ord = new Order(line);
                 orderList.Add(ord);
             }
 
-
+            // Pass data to SimulatedAnnealing class
+            new SimulatedAnnealing(afstandenMatrix,  orderList);
 
         }
+
     }
 }

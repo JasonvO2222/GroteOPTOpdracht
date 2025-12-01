@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GroteOPTOpdracht
 {
-    internal class Order
+    public class Order
     {
         public int orderId {  get; set; }
         public string place;
