@@ -13,18 +13,32 @@ namespace GroteOPTOpdracht
             List<Stop> orderList = new List<Stop>();
 
             // parse the text files
+
             StreamReader afstanden = new StreamReader("AfstandenMatrix.txt");
             string line = afstanden.ReadLine();
-            line = afstanden.ReadLine();
 
             // fill distance/duration matrix
-            while (line != null) {
-                string[] splt = line.Split(';');
-                int i = int.Parse(splt[0]);
-                int j = int.Parse(splt[1]);
-                afstandenMatrix[i, j, 0] = int.Parse(splt[2]);
-                afstandenMatrix[i, j, 1] = int.Parse(splt[3]);
-                line = afstanden.ReadLine();
+            while ((line = afstanden.ReadLine()) != null) {
+
+                int i = 0, j = 0, dist = 0, time = 0;
+                int index = 0, start = 0;
+
+                for (int k = 0; k < line.Length; k++)
+                {
+                    if (line[k] == ';')
+                    {
+                        int num = ParseInt(line, start, k - start);
+                        if (index == 0) i = num;
+                        else if (index == 1) j = num;
+                        else if (index == 2) dist = num;
+                        index++;
+                        start = k + 1;
+                    }
+                }
+                time = ParseInt(line, start, line.Length - start);
+
+                afstandenMatrix[i, j, 0] = dist;
+                afstandenMatrix[i, j, 1] = time;
             }
 
             StreamReader orders = new StreamReader("Orderbestand.txt");
@@ -54,6 +68,16 @@ namespace GroteOPTOpdracht
             // Pass data to SimulatedAnnealing class
             new SimulatedAnnealing(afstandenMatrix,  orderList);
 
+        }
+
+        static int ParseInt(string str, int start, int length)
+        {
+            int result = 0;
+            for (int i = 0; i < length; i++)
+            {
+                result = result * 10 + (str[start + i] - '0');
+            }
+            return result;
         }
 
     }
