@@ -6,8 +6,12 @@ using System.Threading.Tasks;
 
 namespace GroteOPTOpdracht
 {
-    public class Order
+    public class Stop
     {
+
+        public Stop? next;
+        public Stop? prev;
+
         public int orderId {  get; set; }
         public string place;
         public int frequency;
@@ -18,18 +22,16 @@ namespace GroteOPTOpdracht
         public int XCoordinate;
         public int YCoordinate;
 
-        public Order(string line) {
-            string[] results = line.Split(';');
-            this.orderId = int.Parse(results[0]);
-            this.place = results[1];
-            string freq = results[2].Substring(0, 1);
-            this.frequency = int.Parse(freq);
-            this.containerCount = int.Parse(results[3]);
-            this.containerVolume = int.Parse(results[4]);
-            this.loadingTime = float.Parse(results[5]);
-            this.matrixId = int.Parse(results[6]);
-            this.XCoordinate = int.Parse(results[7]);
-            this.YCoordinate = int.Parse(results[8]);
+        public Stop(int id, string plce, int freq, int contCount, int contVol, float loadTime, int MId, int XCoord, int YCoord) {
+            this.orderId = id;
+            this.place = plce;
+            this.frequency = freq;
+            this.containerCount = contCount;
+            this.containerVolume = contVol;
+            this.loadingTime = loadTime;
+            this.matrixId = MId;
+            this.XCoordinate = XCoord;
+            this.YCoordinate = YCoord;
         }
     }
 }
