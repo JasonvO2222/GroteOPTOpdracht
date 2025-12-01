@@ -11,6 +11,7 @@ namespace GroteOPTOpdracht
 
         public Stop? next;
         public Stop? prev;
+        public Stop[]? siblings;
 
         public int orderId {  get; set; }
         public string place;
@@ -32,6 +33,11 @@ namespace GroteOPTOpdracht
             this.matrixId = MId;
             this.XCoordinate = XCoord;
             this.YCoordinate = YCoord;
+
+            if (freq > 1)
+            {
+                //siblings = new Stop[freq - 1];
+            }
         }
     }
 }

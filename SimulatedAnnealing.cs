@@ -47,7 +47,7 @@ namespace GroteOPTOpdracht
             int durationAfterChange = afstandenMatrix[prevMId, nextMId, 1];
             int timeDiff = durationAfterChange - currentDuration;
 
-            if (timeDiff >= 0) // if the change is an improvement follow through
+            if (timeDiff <= 0) // if the change is an improvement follow through
             {
                 oplossing.RemoveStop(stop, index);
                 return true;

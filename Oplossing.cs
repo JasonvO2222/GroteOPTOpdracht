@@ -9,8 +9,8 @@ namespace GroteOPTOpdracht
 {
     public class Oplossing
     {
-        public List<Stop> stops;
-        public List<Stop> ignore;
+        public List<Stop> stops;  //stops we visit
+        public List<Stop> ignore; //stops we dont visit
         public int tijd;
         private static readonly Random rndIndex = new Random();
 
@@ -36,8 +36,8 @@ namespace GroteOPTOpdracht
                 tijd += afstandenMatrix[stops[i - 1].matrixId, stops[i].matrixId, 1];
 
             }
-            stops[stops.Count].prev = stops[stops.Count - 1];
-            tijd += afstandenMatrix[stops[stops.Count - 1].matrixId, stops[stops.Count].matrixId, 1];
+            stops[stops.Count - 1].prev = stops[stops.Count - 2];
+            tijd += afstandenMatrix[stops[stops.Count - 2].matrixId, stops[stops.Count - 1].matrixId, 1];
 
         }
 
