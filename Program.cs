@@ -41,13 +41,13 @@ namespace GroteOPTOpdracht
                 afstandenMatrix[i, j, 1] = time;
             }
 
-            Console.WriteLine("Read matrix complete");
 
             StreamReader orders = new StreamReader("Orderbestand.txt");
             line = orders.ReadLine();
 
             // create order objects for each order
-            while ((line = orders.ReadLine()) != null) {
+            while ((line = orders.ReadLine()) != null)
+            {
 
                 string[] results = line.Split(';');
                 int orderId = int.Parse(results[0]);
@@ -60,14 +60,13 @@ namespace GroteOPTOpdracht
                 int matrixId = int.Parse(results[6]);
                 int XCoordinate = int.Parse(results[7]);
                 int YCoordinate = int.Parse(results[8]);
-                Stop stop = new Stop(orderId, place, frequency, containerCount, 
-                                     containerVolume, loadingTime, matrixId, 
+                Stop stop = new Stop(orderId, place, frequency, containerCount,
+                                     containerVolume, loadingTime, matrixId,
                                      XCoordinate, YCoordinate);
                 orderList.Add(stop);
 
 
             }
-            Console.WriteLine("Read orders complete");
 
             // Pass data to SimulatedAnnealing class
             new SimulatedAnnealing(afstandenMatrix,  orderList);

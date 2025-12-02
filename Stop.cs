@@ -33,11 +33,6 @@ namespace GroteOPTOpdracht
             this.matrixId = MId;
             this.XCoordinate = XCoord;
             this.YCoordinate = YCoord;
-
-            if (freq > 1)
-            {
-                //siblings = new Stop[freq - 1];
-            }
         }
     }
 }
