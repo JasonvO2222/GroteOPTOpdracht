@@ -1,5 +1,6 @@
 ﻿
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace GroteOPTOpdracht
 {
@@ -56,7 +57,7 @@ namespace GroteOPTOpdracht
                 int frequency = int.Parse(freq);
                 int containerCount = int.Parse(results[3]);
                 int containerVolume = int.Parse(results[4]);
-                float loadingTime = float.Parse(results[5]);
+                float loadingTime = float.Parse(results[5], CultureInfo.InvariantCulture);
                 int matrixId = int.Parse(results[6]);
                 int XCoordinate = int.Parse(results[7]);
                 int YCoordinate = int.Parse(results[8]);

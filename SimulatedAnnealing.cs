@@ -22,20 +22,22 @@ namespace GroteOPTOpdracht
             oplossing = new Oplossing(orderList, afstandenMatrix);
 
             // test
-            ConsiderRemove();
+            ConsiderRemove(oplossing.stopsAuto1); // Consider remove van route auto 1 of auto 2
 
+            Console.WriteLine($"Stops truck 1: {oplossing.stopsAuto1.Count}");
+            Console.WriteLine($"Stops truck 2: {oplossing.stopsAuto2.Count}");
             Console.WriteLine($"ignored orders: {oplossing.ignore.Count}");
             Console.WriteLine($"total time: {oplossing.tijd}");
         }
 
 
-        private bool ConsiderRemove()
+        private bool ConsiderRemove(List<Stop> stopsAuto)
         {
             // pick random stop to remove from stops(list)
-            int? i = oplossing.pickRandomStop();
+            int? i = oplossing.pickRandomStop(stopsAuto);
             if (!i.HasValue) { return false; } // cancel if stops(list) was empty
             int index = (int)i;
-            Stop stop = oplossing.stops[index];
+            Stop stop = stopsAuto[index];
 
             // add null protection for when stop.prev/next is null --!!
             int currentMId = stop.matrixId;
@@ -49,12 +51,12 @@ namespace GroteOPTOpdracht
 
             if (timeDiff <= 0) // if the change is an improvement follow through
             {
-                oplossing.RemoveStop(stop, index);
+                oplossing.RemoveStop(stopsAuto, stop, index);
                 return true;
             }
             else if (RollChance(timeDiff)) // if the chance roll returns true, follow through
             {
-                oplossing.RemoveStop(stop, index);
+                oplossing.RemoveStop(stopsAuto, stop, index);
                 return true;
             }
 

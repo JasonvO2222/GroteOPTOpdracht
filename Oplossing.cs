@@ -9,22 +9,24 @@ namespace GroteOPTOpdracht
 {
     public class Oplossing
     {
-        public List<Stop> stops;  //stops we visit
+        public List<Stop> stopsAuto1;  //stops we visit with truck 1
+        public List<Stop> stopsAuto2;  //stops we visit with truck 2
         public List<Stop> ignore; //stops we dont visit
         public int tijd;
         private static readonly Random rndIndex = new Random();
 
         public Oplossing(List<Stop> orderList, int[,,] afstandenMatrix)
         {
-            stops = new List<Stop>();
+            stopsAuto1 = new List<Stop>();
+            stopsAuto2 = new List<Stop>();
             ignore = new List<Stop>();
             tijd = 0;
 
             // Assign constants
-            float bezorgtijd = 720; // tijd die de auto kan bezorgen op een dag
+            float bezorgtijd = 43200; // tijd die de auto kan bezorgen op een dag in seconden
             int vuilnisRuimte = 100000; // ruimte in de auto voor comprimeren
-            int stortTijd = 30;
-            Stop stort = new Stop(0, "MAARHEEZE STORT", 0, 0, 0, 30, 287, 56343016, 513026712);
+            int stortTijd = 1800;
+            Stop stort = new Stop(0, "MAARHEEZE STORT", 0, 0, 0, stortTijd, 287, 56343016, 513026712);
             Stop dagWissel = new Stop(-1, "MAARHEEZE DAGWISSEL", 0, 0, 0, 0, 287, 56343016, 513026712); // element gebruikt om een volgende dag aan te geven in de route
 
             // Copy orderlist
@@ -34,21 +36,22 @@ namespace GroteOPTOpdracht
                 stopsOver.Add(new Stop(stop.orderId, stop.place, stop.frequency, stop.containerCount, stop.containerVolume, stop.loadingTime, stop.matrixId, stop.XCoordinate, stop.YCoordinate));
             }
 
-            WeekRoute(stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
+            WeekRoute(stopsAuto1, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
+            WeekRoute(stopsAuto2, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
 
             // calculate total time and add prev/references to stops in stops(list)
-            for (int i = 1; i < (stops.Count - 1); i++) {
-                tijd += afstandenMatrix[stops[i - 1].matrixId, stops[i].matrixId, 1];
-            }
-            tijd += afstandenMatrix[stops[stops.Count - 2].matrixId, stops[stops.Count - 1].matrixId, 1];
+            //for (int i = 1; i < (stops.Count - 1); i++) {
+            //    tijd += afstandenMatrix[stops[i - 1].matrixId, stops[i].matrixId, 1];
+            //}
+            //tijd += afstandenMatrix[stops[stops.Count - 2].matrixId, stops[stops.Count - 1].matrixId, 1];
 
         }
 
-        public int? pickRandomStop()
+        public int? pickRandomStop(List<Stop> stopsAuto)
         {
             int? stopsIndex;
-            if (!stops.Any()) stopsIndex = null;
-            else stopsIndex = rndIndex.Next(stops.Count);
+            if (!stopsAuto.Any()) stopsIndex = null;
+            else stopsIndex = rndIndex.Next(stopsAuto.Count);
 
             return stopsIndex;
         }
@@ -63,33 +66,33 @@ namespace GroteOPTOpdracht
             return ignoreIndex;
         }
 
-        public void RemoveStop(Stop stop, int index)
+        public void RemoveStop(List<Stop> stopsAuto, Stop stop, int index)
         {
             // switch object with last object in stops(list) and add it to ignore(list) and remove it from stops(list)
-            int lastIndex = stops.Count - 1;
-            (stops[lastIndex], stops[index]) = (stops[index], stops[lastIndex]);
-            ignore.Add(stops[lastIndex]);
-            stops.RemoveAt(lastIndex);
+            int lastIndex = stopsAuto.Count - 1;
+            (stopsAuto[lastIndex], stopsAuto[index]) = (stopsAuto[index], stopsAuto[lastIndex]);
+            ignore.Add(stopsAuto[lastIndex]);
+            stopsAuto.RemoveAt(lastIndex);
 
             // add null handling --!!
             (stop.prev.next, stop.next.prev) = (stop.next.prev, stop.prev.next);
-
         }
 
-        Stop DagRoute(List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop laatsteStopVorigeDag)
+        Stop DagRoute(List<Stop> stops, List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop laatsteStopVorigeDag)
         {
             float tijdOver = bezorgtijd;
             int ruimteOver = vuilnisRuimte;
             Stop vorigeStop = laatsteStopVorigeDag;
 
-            while (true)
+            while (stopsOver.Count > 0)
             {
                 // trek randomStop uit orderlist
                 int randomIndex = rndIndex.Next(stopsOver.Count);
                 Stop randomStop = stopsOver[randomIndex];
+
                 // check of er genoeg tijd is om deze stop te doen
                 int reistijdNaarRandomStop = afstandenMatrix[vorigeStop.matrixId, randomStop.matrixId, 1];
-                if (tijdOver < reistijdNaarRandomStop + randomStop.loadingTime + stortTijd + afstandenMatrix[randomStop.matrixId, stort.matrixId, 1])
+                if (tijdOver < reistijdNaarRandomStop + 60 * randomStop.loadingTime + stortTijd + afstandenMatrix[randomStop.matrixId, stort.matrixId, 1])
                 {
                     // als er geen tijd is om naar de randomStop te gaan, rijden we naar de stort om voor de laatste keer deze dag te storten
                     Stop tijdStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate);
@@ -120,20 +123,21 @@ namespace GroteOPTOpdracht
                 vorigeStop.next = randomStop;
                 randomStop.prev = vorigeStop;
 
-                tijdOver -= reistijdNaarRandomStop + randomStop.loadingTime;
+                tijdOver -= (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime));
                 ruimteOver -= randomStop.containerCount * randomStop.containerVolume;
 
-                stopsOver[randomIndex] = stopsOver[stops.Count - 1];
-                stopsOver.RemoveAt(stops.Count - 1);
+                stopsOver[randomIndex] = stopsOver[stopsOver.Count - 1];
+                stopsOver.RemoveAt(stopsOver.Count - 1);
 
                 // zet vorige stop voor volgende ronde van loop
                 vorigeStop = randomStop;
             }
+
+            return vorigeStop; // If there are no more stops to go to something has gone wrong
         }
 
-        void WeekRoute(List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop dagWissel)
+        void WeekRoute(List<Stop> stops, List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop dagWissel)
         {
-
             // Start op maandag bij de stort
             stops.Add(stort);
             Stop laatsteStopVorigeDag = stort;
@@ -141,7 +145,7 @@ namespace GroteOPTOpdracht
             // maak een route voor elke dag
             for (int i = 0; i < 5; i++)
             {
-                laatsteStopVorigeDag = DagRoute(stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, laatsteStopVorigeDag);
+                laatsteStopVorigeDag = DagRoute(stops, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, laatsteStopVorigeDag);
 
                 Stop nieuweDag = new Stop(dagWissel.orderId, dagWissel.place, dagWissel.frequency, dagWissel.containerCount, dagWissel.containerVolume, dagWissel.loadingTime, dagWissel.matrixId, dagWissel.XCoordinate, dagWissel.YCoordinate);
                 stops.Add(nieuweDag);
