@@ -12,7 +12,7 @@ namespace GroteOPTOpdracht
         public List<Stop> stopsAuto1;  //stops we visit with truck 1
         public List<Stop> stopsAuto2;  //stops we visit with truck 2
         public List<Stop> ignore; //stops we dont visit
-        public int tijd;
+        public float tijd;
         private static readonly Random rndIndex = new Random();
 
         public Oplossing(List<Stop> orderList, int[,,] afstandenMatrix)
@@ -38,13 +38,6 @@ namespace GroteOPTOpdracht
 
             WeekRoute(stopsAuto1, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
             WeekRoute(stopsAuto2, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
-
-            // calculate total time and add prev/references to stops in stops(list)
-            //for (int i = 1; i < (stops.Count - 1); i++) {
-            //    tijd += afstandenMatrix[stops[i - 1].matrixId, stops[i].matrixId, 1];
-            //}
-            //tijd += afstandenMatrix[stops[stops.Count - 2].matrixId, stops[stops.Count - 1].matrixId, 1];
-
         }
 
         public int? pickRandomStop(List<Stop> stopsAuto)
@@ -92,21 +85,27 @@ namespace GroteOPTOpdracht
 
                 // check of er genoeg tijd is om deze stop te doen
                 int reistijdNaarRandomStop = afstandenMatrix[vorigeStop.matrixId, randomStop.matrixId, 1];
-                if (tijdOver < reistijdNaarRandomStop + 60 * randomStop.loadingTime + stortTijd + afstandenMatrix[randomStop.matrixId, stort.matrixId, 1])
+                int TijdNaarStortvanafRandomStop = stortTijd + afstandenMatrix[randomStop.matrixId, stort.matrixId, 1];
+                int tijdNaarStortVorigeStop = afstandenMatrix[vorigeStop.matrixId, stort.matrixId, 1] + stortTijd;
+
+                // als er geen tijd is om naar de randomStop te gaan, rijden we naar de stort om voor de laatste keer deze dag te storten
+                if (tijdOver < (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime) + TijdNaarStortvanafRandomStop))
                 {
-                    // als er geen tijd is om naar de randomStop te gaan, rijden we naar de stort om voor de laatste keer deze dag te storten
                     Stop tijdStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate);
                     stops.Add(tijdStort);
                     tijdOver -= afstandenMatrix[vorigeStop.matrixId, stort.matrixId, 1] + stortTijd;
                     ruimteOver = vuilnisRuimte;
                     vorigeStop.next = tijdStort;
                     tijdStort.prev = vorigeStop;
+
+                    tijd += tijdNaarStortVorigeStop; // tel de tijd om naar de stort te rijden op bij de route tijd
+
                     return tijdStort; // Er is geen tijd meer dus de dag verandert
                 }
 
+                // als er niet genoeg ruimte meer is in de auto rijden we terug naar de stort
                 if (ruimteOver < (randomStop.containerCount) * (randomStop.containerVolume))
                 {
-                    // als er niet genoeg ruimte meer is in de auto rijden we terug naar de stort
                     Stop ruimteStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate);
                     stops.Add(ruimteStort);
                     tijdOver -= afstandenMatrix[vorigeStop.matrixId, stort.matrixId, 1] + stortTijd;
@@ -114,6 +113,8 @@ namespace GroteOPTOpdracht
                     vorigeStop.next = ruimteStort;
                     ruimteStort.prev = vorigeStop;
                     vorigeStop = ruimteStort;
+
+                    tijd += tijdNaarStortVorigeStop; // tel de tijd om naar de stort te rijden op bij de route tijd
 
                     continue; // de dag hoeft dan niet perse te veranderen
                 }
@@ -123,11 +124,14 @@ namespace GroteOPTOpdracht
                 vorigeStop.next = randomStop;
                 randomStop.prev = vorigeStop;
 
-                tijdOver -= (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime));
+                float tijdGekost = (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime)); // de tijd die het kost om naar de stop te rijden en te laden
+                tijdOver -= tijdGekost;
                 ruimteOver -= randomStop.containerCount * randomStop.containerVolume;
 
                 stopsOver[randomIndex] = stopsOver[stopsOver.Count - 1];
                 stopsOver.RemoveAt(stopsOver.Count - 1);
+
+                tijd += tijdGekost; // tel de tijd om deze stop te doen op bij de route tijd
 
                 // zet vorige stop voor volgende ronde van loop
                 vorigeStop = randomStop;
