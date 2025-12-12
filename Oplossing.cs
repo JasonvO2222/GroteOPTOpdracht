@@ -28,7 +28,7 @@ namespace GroteOPTOpdracht
             int vuilnisRuimte = 100000; // ruimte in de auto voor comprimeren
             int stortTijd = 1800;
             Stop stort = new Stop(0, "MAARHEEZE STORT", 0, 0, 0, stortTijd, 287, 56343016, 513026712);
-            Stop dagWissel = new Stop(-1, "MAARHEEZE DAGWISSEL", 0, 0, 0, 0, 287, 56343016, 513026712); // element gebruikt om een volgende dag aan te geven in de route
+            Stop dagWissel = new Stop(-1, "MAARHEEZE DAGWISSEL", 0, 0, 0, 0, 287, 56343016, 513026712, -1); // element gebruikt om een volgende dag aan te geven in de route
 
             // Copy orderlist
             List<Stop> stopsOver = OrdersToStops(orderList);
@@ -68,7 +68,7 @@ namespace GroteOPTOpdracht
             (stop.prev.next, stop.next.prev) = (stop.next.prev, stop.prev.next);
         }
 
-        Stop DagRoute(List<Stop> stops, List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop laatsteStopVorigeDag)
+        Stop DagRoute(List<Stop> stops, List<Stop> stopsOver, int[,,] afstandenMatrix, float bezorgtijd, int vuilnisRuimte, int stortTijd, Stop stort, Stop laatsteStopVorigeDag, int dag)
         {
             float tijdOver = bezorgtijd;
             int ruimteOver = vuilnisRuimte;
@@ -88,7 +88,7 @@ namespace GroteOPTOpdracht
                 // als er geen tijd is om naar de randomStop te gaan, rijden we naar de stort om voor de laatste keer deze dag te storten
                 if (tijdOver < (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime) + TijdNaarStortvanafRandomStop))
                 {
-                    Stop tijdStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate);
+                    Stop tijdStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate, dag);
                     stops.Add(tijdStort);
                     tijdOver -= afstandenMatrix[vorigeStop.matrixId, stort.matrixId, 1] + stortTijd;
                     ruimteOver = vuilnisRuimte;
@@ -103,7 +103,7 @@ namespace GroteOPTOpdracht
                 // als er niet genoeg ruimte meer is in de auto rijden we terug naar de stort
                 if (ruimteOver < (randomStop.containerCount) * (randomStop.containerVolume))
                 {
-                    Stop ruimteStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate);
+                    Stop ruimteStort = new Stop(stort.orderId, stort.place, stort.frequency, stort.containerCount, stort.containerVolume, stort.loadingTime, stort.matrixId, stort.XCoordinate, stort.YCoordinate, dag);
                     stops.Add(ruimteStort);
                     tijdOver -= afstandenMatrix[vorigeStop.matrixId, stort.matrixId, 1] + stortTijd;
                     ruimteOver = vuilnisRuimte;
@@ -116,22 +116,24 @@ namespace GroteOPTOpdracht
                     continue; // de dag hoeft dan niet perse te veranderen
                 }
 
-                // voeg randomStop toe aan route auto
-                stops.Add(randomStop);
-                vorigeStop.next = randomStop;
-                randomStop.prev = vorigeStop;
+                // Als de freq hoger is dan 1 moeten we letten op de plaats in de route van de siblings
+                if (randomStop.frequency == 1 || (randomStop.frequency > 1 && AddStopFreqGrTh1(randomStop, dag)))
+                {
+                    // anders voegen we randomStop gewoon toe aan route auto
+                    stops.Add(randomStop);
+                    vorigeStop.next = randomStop;
+                    randomStop.prev = vorigeStop;
 
-                float tijdGekost = (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime)); // de tijd die het kost om naar de stop te rijden en te laden
-                tijdOver -= tijdGekost;
-                ruimteOver -= randomStop.containerCount * randomStop.containerVolume;
+                    float tijdGekost = (float)(reistijdNaarRandomStop + (float)(60 * randomStop.loadingTime)); // de tijd die het kost om naar de stop te rijden en te laden
+                    tijdOver -= tijdGekost;
+                    ruimteOver -= randomStop.containerCount * randomStop.containerVolume;
 
-                stopsOver[randomIndex] = stopsOver[stopsOver.Count - 1];
-                stopsOver.RemoveAt(stopsOver.Count - 1);
+                    stopsOver[randomIndex] = stopsOver[stopsOver.Count - 1];
+                    stopsOver.RemoveAt(stopsOver.Count - 1);
 
-                tijd += tijdGekost; // tel de tijd om deze stop te doen op bij de route tijd
-
-                // zet vorige stop voor volgende ronde van loop
-                vorigeStop = randomStop;
+                    tijd += tijdGekost; // tel de tijd om deze stop te doen op bij de route tijd
+                    vorigeStop = randomStop; // zet vorige stop voor volgende ronde van loop
+                }
             }
 
             return vorigeStop; // If there are no more stops to go to something has gone wrong
@@ -146,9 +148,9 @@ namespace GroteOPTOpdracht
             // maak een route voor elke dag
             for (int i = 0; i < 5; i++)
             {
-                laatsteStopVorigeDag = DagRoute(stops, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, laatsteStopVorigeDag);
+                laatsteStopVorigeDag = DagRoute(stops, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, laatsteStopVorigeDag, i);
 
-                Stop nieuweDag = new Stop(dagWissel.orderId, dagWissel.place, dagWissel.frequency, dagWissel.containerCount, dagWissel.containerVolume, dagWissel.loadingTime, dagWissel.matrixId, dagWissel.XCoordinate, dagWissel.YCoordinate);
+                Stop nieuweDag = new Stop(dagWissel.orderId, dagWissel.place, dagWissel.frequency, dagWissel.containerCount, dagWissel.containerVolume, dagWissel.loadingTime, dagWissel.matrixId, dagWissel.XCoordinate, dagWissel.YCoordinate, dagWissel.dag);
                 stops.Add(nieuweDag);
                 laatsteStopVorigeDag.next = nieuweDag;
                 nieuweDag.prev = laatsteStopVorigeDag;
@@ -195,6 +197,31 @@ namespace GroteOPTOpdracht
                     stops.Add(new Stop(stop.orderId, stop.place, stop.frequency, stop.containerCount, stop.containerVolume, stop.loadingTime, stop.matrixId, stop.XCoordinate, stop.YCoordinate));
             }
             return stops;
+        }
+
+        // returns true if a given stop can be placed in the route on a given day
+        // (meaning that if there are no siblings in the route yet, it is approved and if there is a sibling in the route it the day does not clash with the sibling)
+        bool AddStopFreqGrTh1(Stop stop, int dag)
+        {
+            if (stop.frequency == 2)
+            {
+                if (stop.siblings[0].dag != -2 && dag != stop.siblings[0].dag + 3 && dag != stop.siblings[0].dag - 3)
+                    return false;
+            }
+            else if (stop.frequency == 3)
+            {
+                if ((dag != 0 && dag != 2 && dag != 4) || (stop.siblings[0].dag == dag || stop.siblings[1].dag == dag))
+                    return false;
+            }
+            else if (stop.frequency == 4)
+            {
+                foreach (Stop sibling in stop.siblings)
+                {
+                    if (sibling.dag == dag)
+                        return false;
+                }
+            }
+            return true;
         }
     }
 }

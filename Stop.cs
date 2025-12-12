@@ -22,8 +22,9 @@ namespace GroteOPTOpdracht
         public int matrixId;
         public int XCoordinate;
         public int YCoordinate;
+        public int dag; // Dagen 0-4 corresponderen respectievelijk met maandag-vrijdag (-1 is dagwissel, -2 betekent dat de stop niet in de route zit)
 
-        public Stop(int id, string plce, int freq, int contCount, int contVol, float loadTime, int MId, int XCoord, int YCoord) {
+        public Stop(int id, string plce, int freq, int contCount, int contVol, float loadTime, int MId, int XCoord, int YCoord, int dag = -2) {
             this.orderId = id;
             this.place = plce;
             this.frequency = freq;
@@ -33,6 +34,7 @@ namespace GroteOPTOpdracht
             this.matrixId = MId;
             this.XCoordinate = XCoord;
             this.YCoordinate = YCoord;
+            this.dag = dag;
             if (freq > 1)
                 this.siblings = new Stop[freq-1];
         }
