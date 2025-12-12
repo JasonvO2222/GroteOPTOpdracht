@@ -11,7 +11,7 @@ namespace GroteOPTOpdracht
         {
             //initialize datastructures
             int[,,] afstandenMatrix = new int[1099, 1099, 2];
-            List<Stop> orderList = new List<Stop>();
+            List<CollectionStop> orderList = new List<CollectionStop>();
 
             // parse the text files
 
@@ -41,10 +41,13 @@ namespace GroteOPTOpdracht
                 afstandenMatrix[i, j, 0] = dist;
                 afstandenMatrix[i, j, 1] = time;
             }
-
+            afstanden.Close();
 
             StreamReader orders = new StreamReader("Orderbestand.txt");
             line = orders.ReadLine();
+
+
+            float penalty = 0; //Calculate penalty ahead of time
 
             // create order objects for each order
             while ((line = orders.ReadLine()) != null)
@@ -57,20 +60,53 @@ namespace GroteOPTOpdracht
                 int frequency = int.Parse(freq);
                 int containerCount = int.Parse(results[3]);
                 int containerVolume = int.Parse(results[4]);
-                float loadingTime = float.Parse(results[5], CultureInfo.InvariantCulture);
+                float loadingTime = float.Parse(results[5]); //in minutes
+                penalty += (loadingTime * 60); //accumulate penalty
                 int matrixId = int.Parse(results[6]);
                 int XCoordinate = int.Parse(results[7]);
                 int YCoordinate = int.Parse(results[8]);
-                Stop stop = new Stop(orderId, place, frequency, containerCount,
-                                     containerVolume, loadingTime, matrixId,
-                                     XCoordinate, YCoordinate);
-                orderList.Add(stop);
 
+                if (frequency > 1) { //if multiple stops required
+                    CollectionStop[] stops = new CollectionStop[frequency];
+                    for (int i = 0; i < frequency; i++) //create that many stops
+                    {
 
+                        CollectionStop s = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
+                                             containerVolume, loadingTime,
+                                             XCoordinate, YCoordinate);
+                        stops[i] = s;
+                        orderList.Add(s);
+                    }
+                    for (int i = 0; i < frequency; i++) //refer them all to one another
+                    {
+                        CollectionStop current = stops[i];
+                        current.siblings = new CollectionStop[frequency-1];
+                        int k = 0;
+
+                        for (int j = 0; j < frequency; j++)
+                        {
+                            if (i != j)
+                            {
+                                current.siblings[k] = stops[j];
+                                k++;
+                            }
+                        }
+                    }
+                }
+                else //if a single stop is required simply add that one
+                {
+                    CollectionStop stop = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
+                                         containerVolume, loadingTime,
+                                         XCoordinate, YCoordinate);
+                    orderList.Add(stop);
+
+                }
             }
 
+            orders.Close();
+
             // Pass data to SimulatedAnnealing class
-            new SimulatedAnnealing(afstandenMatrix,  orderList);
+            new SimulatedAnnealing(afstandenMatrix,  orderList, penalty);
 
         }
 

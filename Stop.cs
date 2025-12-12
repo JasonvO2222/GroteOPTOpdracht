@@ -11,28 +11,66 @@ namespace GroteOPTOpdracht
 
         public Stop? next;
         public Stop? prev;
-        public Stop[]? siblings;
+        public int matrixId;
 
-        public int orderId {  get; set; }
+        public Stop(int MId) {
+            this.matrixId = MId;
+        }
+    }
+
+    public class OfloadStop : Stop
+    {
+        public int volume;
+        public OfloadStop? nextOfloadStop;
+
+        public OfloadStop(int volume) : base (287)
+        {
+            this.volume = volume;
+        }
+    }
+
+    public class DayStop : Stop
+    {
+        public string day;
+        public float dayTime;
+
+        public DayStop(string day, int dagTijd) : base (-1)
+        {
+            this.day = day;
+            this.dayTime = dagTijd;
+        }
+    }
+
+    public class CollectionStop : Stop
+    {
+
+        public CollectionStop[]? siblings;
+        public DayStop? dayStop;
+        public OfloadStop? ofloadStop;
+
+        public bool included;
+        public int orderId { get; set; }
         public string place;
         public int frequency;
         public int containerCount;
         public int containerVolume;
-        public float loadingTime; //in minutes
-        public int matrixId;
+        public float loadingTime;
         public int XCoordinate;
         public int YCoordinate;
 
-        public Stop(int id, string plce, int freq, int contCount, int contVol, float loadTime, int MId, int XCoord, int YCoord) {
+
+        public CollectionStop(int MId, int id, string plce, int freq, int contCount, int contVol, float loadTime, int XCoord, int YCoord) : base(MId)
+        {
             this.orderId = id;
             this.place = plce;
             this.frequency = freq;
             this.containerCount = contCount;
             this.containerVolume = contVol;
-            this.loadingTime = loadTime;
-            this.matrixId = MId;
-            this.XCoordinate = XCoord;
-            this.YCoordinate = YCoord;
+            this.loadingTime = loadTime * 60;
+            this.included = false;
         }
     }
+
+
+
 }
