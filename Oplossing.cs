@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 using System.Threading.Tasks;
@@ -30,11 +31,7 @@ namespace GroteOPTOpdracht
             Stop dagWissel = new Stop(-1, "MAARHEEZE DAGWISSEL", 0, 0, 0, 0, 287, 56343016, 513026712); // element gebruikt om een volgende dag aan te geven in de route
 
             // Copy orderlist
-            List<Stop> stopsOver = new List<Stop>(orderList.Count);
-            foreach (Stop stop in orderList)
-            {
-                stopsOver.Add(new Stop(stop.orderId, stop.place, stop.frequency, stop.containerCount, stop.containerVolume, stop.loadingTime, stop.matrixId, stop.XCoordinate, stop.YCoordinate));
-            }
+            List<Stop> stopsOver = OrdersToStops(orderList);
 
             WeekRoute(stopsAuto1, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
             WeekRoute(stopsAuto2, stopsOver, afstandenMatrix, bezorgtijd, vuilnisRuimte, stortTijd, stort, dagWissel);
@@ -162,5 +159,42 @@ namespace GroteOPTOpdracht
             ignore = stopsOver; // De stops die niet aan de route zijn toegevoegd worden genegeerd
         }
 
+        List<Stop> OrdersToStops(List<Stop> orderList)
+        {
+            List<Stop> stops = new List<Stop>(orderList.Count);
+            foreach (Stop stop in orderList)
+            {
+                if (stop.frequency > 1)
+                {
+                    List<Stop> temp = new List<Stop>(stop.frequency);
+                    // Make as much stops as the frequency demands
+                    for (int i = 0; i < stop.frequency; i++)
+                    {
+                        Stop sibling = new Stop(stop.orderId, stop.place, stop.frequency, stop.containerCount, stop.containerVolume, stop.loadingTime, stop.matrixId, stop.XCoordinate, stop.YCoordinate);
+                        stops.Add(sibling);
+                        temp.Add(sibling);
+                    }
+
+                    // Add the siblings for each stop
+                    for (int j = 0; j < temp.Count; j++)
+                    {
+                        Stop s = temp[j];
+                        int indexSiblings = 0;
+
+                        for (int i = 0; i < s.frequency; i++)
+                        {
+                            if (i != j)
+                            {
+                                s.siblings[indexSiblings] = temp[i];
+                                indexSiblings++;
+                            }
+                        }
+                    }
+                }
+                else
+                    stops.Add(new Stop(stop.orderId, stop.place, stop.frequency, stop.containerCount, stop.containerVolume, stop.loadingTime, stop.matrixId, stop.XCoordinate, stop.YCoordinate));
+            }
+            return stops;
+        }
     }
 }
