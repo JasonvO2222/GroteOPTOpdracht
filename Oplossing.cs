@@ -13,8 +13,8 @@ namespace GroteOPTOpdracht
     {
         public List<CollectionStop> stops;  //stops we visit
         public List<CollectionStop> ignore; //stops we dont visit
-        public float tijd;
-        public float penalty;
+        public double tijd;
+        public double penalty;
         private static readonly Random rnd = new Random();
         public int ofloadingTime = 1800; //time it takes to ofload
         public int cargoSpace = 100000; //liters of space (before compression) a truck can fit
@@ -42,9 +42,9 @@ namespace GroteOPTOpdracht
 
 
             // Create day divider nodes and connect them (each DayStop is a node which divides the linkedlist into days twice for both trucks)
-            DayStop[] dayStops = new DayStop[10];
-            String[] days = new String[10] { "monday", "tuesday", "wednesday", "thursday", "friday", "monday", "tuesday", "wednesday", "thursday", "friday" };
-            for (int i = 0; i < 10; i ++)
+            DayStop[] dayStops = new DayStop[11];
+            String[] days = new String[11] { "start", "monday", "tuesday", "wednesday", "thursday", "friday", "monday", "tuesday", "wednesday", "thursday", "friday" };
+            for (int i = 0; i < 11; i ++)
             {
                 DayStop dStop = new DayStop(days[i], 0);
                 dayStops[i] = dStop;
@@ -69,6 +69,8 @@ namespace GroteOPTOpdracht
             bool ignoreEmpty = false;
             foreach (DayStop dStop in dayStops)
             {
+                if (dStop.day == "start") continue;
+
                 bool maxTimeReached = false;
 
                 if (ignoreEmpty) { continue; }
@@ -79,16 +81,11 @@ namespace GroteOPTOpdracht
 
                     // first insert an ofload stop
                     OfloadStop oStop = new OfloadStop(0);
-                    if (dStop.dayTime + ofloadingTime > maxDayTime) { maxLoadReached = true; continue; }
+                    if (dStop.dayTime + ofloadingTime > maxDayTime) { maxTimeReached = true; continue; }
                     dStop.dayTime += ofloadingTime;
                     tijd += ofloadingTime;
 
-                    if (dStop.prev == null) //in the case insert ofload before dStop
-                    {
-                        dStop.prev = oStop;     // dStop.prev = ofload
-                        oStop.next = dStop;     // ofload.next = dStop
-                    }
-                    else if (dStop.prev is DayStop) // in case insert ofload between dStop1 dStop2
+                    if (dStop.prev is DayStop) // in case insert ofload between dStop1 dStop2
                     {
                         oStop.prev = dStop.prev; // ofload.prev = dStop1
                         dStop.prev.next = oStop; // dStop1.next = ofload
@@ -110,30 +107,22 @@ namespace GroteOPTOpdracht
                         if (ignore.Count == 0) { ignoreEmpty = true; continue; }
                         CollectionStop stop = ignore[0];
 
-                        if(oStop.prev == null)
-                        {
-                            oStop.prev = stop;
-                            stop.next = oStop;
-                            stop.ofloadStop = oStop;
-                            stop.dayStop = dStop;
-                            oStop.volume += (stop.containerCount * stop.containerVolume);
-                            dStop.dayTime = dStop.dayTime + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
-                                                          + stop.loadingTime;
-                            tijd = tijd + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
-                                        + stop.loadingTime;
-                        }
-                        else if (oStop.prev is DayStop)
+                        if (oStop.prev is DayStop)
                         {
                             int volumeCheck = oStop.volume + (stop.containerCount * stop.containerVolume);
                             if (volumeCheck > cargoSpace) { maxLoadReached = true; continue; }
 
                             float timeCheck = dStop.dayTime + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
-                                                          + stop.loadingTime;
+                                                            + afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
+                                                            - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
+                                                            + stop.loadingTime;
                             if (timeCheck > maxDayTime) { maxTimeReached = true; continue; }
 
                             oStop.volume = volumeCheck;
                             dStop.dayTime = timeCheck;
                             tijd = tijd + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
+                                        + afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
+                                        - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
                                         + stop.loadingTime;
                             oStop.prev.next = stop;
                             stop.prev = oStop.prev;
@@ -156,7 +145,7 @@ namespace GroteOPTOpdracht
 
                             oStop.volume = volumeCheck;
                             dStop.dayTime = timeCheck;
-                            tijd = tijd +afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
+                            tijd = tijd + afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
                                         + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
                                         - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
                                         + stop.loadingTime;
@@ -171,7 +160,7 @@ namespace GroteOPTOpdracht
                         stop.included = true;
                         
                         // check penalty and remove if correct
-                        if (CorrectPickup(stop)) penalty -= (3 * stop.loadingTime);
+                        if (CorrectPickup(stop)) penalty -= (3 * stop.loadingTime * stop.frequency);
 
                         //remove from ignore and add to stops
                         AddStop(0);
@@ -192,18 +181,19 @@ namespace GroteOPTOpdracht
                 "monday" => 1, "tuesday" => 2, "wednesday" => 3, "thursday" => 4, "friday" => 5
             };  }
 
-        public bool CorrectPickup(CollectionStop stop)
+        public bool CorrectPickup(CollectionStop stop, string day = null, bool included = false)
         {
-            if (stop.frequency == 1 && stop.included) { return true; }
+            if (stop.frequency == 1 && (stop.included || included)) { return true; }
             else if (stop.frequency == 1) { return false; }
 
 
             else
             {
-                if (!stop.included) return false;
+                if (!(stop.included || included)) return false;
 
                 string[] weekdays = new string[stop.frequency];
-                weekdays[0] = stop.dayStop.day;
+                if (day != null) { weekdays[0] = day; }
+                else weekdays[0] = stop.dayStop.day;
 
                 for (int i = 1; i < stop.frequency; i++)
                 {
@@ -244,18 +234,21 @@ namespace GroteOPTOpdracht
             ignore.RemoveAt(c);
         }
 
+        public void RemoveStop(int index)
+        {
+            // switch object with last object in stops(list) and add it to ignore(list) and remove it from stops(list)
+            CollectionStop stop = stops[index];
+            ignore.Add(stop);
+            int c = stops.Count - 1;
+            (stops[index], stops[c]) = (stops[c], stops[index]);
+            stops.RemoveAt(c);
+        }
+
         public void OutputSolution()
         {
             StreamWriter sW = new StreamWriter("Resultaat.txt");
-            Stop s = leftMostDayStop;
-            while(true)
-            {
-                if (s.prev != null)
-                {
-                    s = s.prev;
-                }
-                else break;
-            }
+            Stop s = leftMostDayStop.next;
+
             int counter = 1;
             int truck = 1;
             int dagId = 1;
@@ -294,36 +287,82 @@ namespace GroteOPTOpdracht
 
         }
 
-        //public int? pickRandomStop(List<Stop> stopsAuto)
-        //{
-        //    int? stopsIndex;
-        //    if (!stopsAuto.Any()) stopsIndex = null;
-        //    else stopsIndex = rndIndex.Next(stopsAuto.Count);
+        public int? pickRandomStop()
+        {
+            int? index;
+            if (!stops.Any()) index = null;
+            else index = rnd.Next(stops.Count);
 
-        //    return stopsIndex;
-        //}
+            return index;
+        }
 
 
-        //public int? pickRandomIgnoredStop()
-        //{
-        //    int? ignoreIndex;
-        //    if (!ignore.Any()) ignoreIndex = null;
-        //    else ignoreIndex = rndIndex.Next(ignore.Count);
+        public int? pickRandomIgnoredStop()
+        {
+            int? index;
+            if (!ignore.Any()) index = null;
+            else index = rnd.Next(ignore.Count);
 
-        //    return ignoreIndex;
-        //}
+            return index;
+        }
 
-        //public void RemoveStop(List<Stop> stopsAuto, Stop stop, int index)
-        //{
-        //    // switch object with last object in stops(list) and add it to ignore(list) and remove it from stops(list)
-        //    int lastIndex = stopsAuto.Count - 1;
-        //    (stopsAuto[lastIndex], stopsAuto[index]) = (stopsAuto[index], stopsAuto[lastIndex]);
-        //    ignore.Add(stopsAuto[lastIndex]);
-        //    stopsAuto.RemoveAt(lastIndex);
 
-        //    // add null handling --!!
-        //    (stop.prev.next, stop.next.prev) = (stop.next.prev, stop.prev.next);
-        //}
+        public void Swap(CollectionStop s1, CollectionStop s2)
+        {
+            if (s1.next == s2)
+            {
+                s1.next = s2.next;
+                s2.next.prev = s1;
+                s2.prev = s1.prev;
+                s1.prev.next = s2;
+                s2.next = s1;
+                s1.prev = s2;
+            }
+            else if (s2.next == s1)
+            {
+                s2.next = s1.next;
+                s1.next.prev = s2;
+                s1.prev = s2.prev;
+                s2.prev.next = s1;
+                s1.next = s2;
+                s2.prev = s1;
+            }
+            else
+            {
+                s1.prev.next = s2;
+                s1.next.prev = s2;
+                s2.prev.next = s1;
+                s2.next.prev = s1;
+                (s1.next, s2.next) = (s2.next, s1.next);
+                (s1.prev, s2.prev) = (s2.prev, s1.prev);
+            }
+
+            (s1.dayStop, s2.dayStop) = (s2.dayStop, s1.dayStop);
+            (s1.ofloadStop, s2.ofloadStop) = (s2.ofloadStop, s1.ofloadStop);
+
+        }
+
+        public void Insert(CollectionStop insertNode, CollectionStop newStop)
+        {
+            newStop.next = insertNode.next;
+            insertNode.next.prev = newStop;
+            insertNode.next = newStop;
+            newStop.prev = insertNode;
+            newStop.ofloadStop = insertNode.ofloadStop;
+            newStop.dayStop = insertNode.dayStop;
+            newStop.included = true;
+        }
+
+        public void Remove(CollectionStop stop)
+        {
+            stop.prev.next = stop.next;
+            stop.next.prev = stop.prev;
+            stop.next = null;
+            stop.prev = null;
+            stop.ofloadStop = null;
+            stop.dayStop = null;
+            stop.included = false;
+        }
 
     }
 }

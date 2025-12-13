@@ -34,7 +34,7 @@ namespace GroteOPTOpdracht
         public string day;
         public float dayTime;
 
-        public DayStop(string day, int dagTijd) : base (-1)
+        public DayStop(string day, int dagTijd) : base (287)
         {
             this.day = day;
             this.dayTime = dagTijd;
@@ -66,7 +66,7 @@ namespace GroteOPTOpdracht
             this.frequency = freq;
             this.containerCount = contCount;
             this.containerVolume = contVol;
-            this.loadingTime = loadTime * 60;
+            this.loadingTime = loadTime;
             this.included = false;
         }
     }

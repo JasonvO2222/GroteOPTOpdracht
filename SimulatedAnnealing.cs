@@ -10,10 +10,12 @@ namespace GroteOPTOpdracht
     public class SimulatedAnnealing
     {
         private double T; //chance variable
+        private float a = 0.98f; //chance var factor 
+        private int Q = 100000; // iterations before factorizing
         private readonly int[,,] afstandenMatrix;
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
-        private static readonly Random rndDouble = new Random();
+        private static readonly Random rnd = new Random();
 
         public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty)
         {
@@ -21,58 +23,254 @@ namespace GroteOPTOpdracht
             orderList = list;
             T = 1;
             Console.WriteLine($"Score voor startoplossing: {(penalty) / 60}");
+            oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
+
+            Console.WriteLine($"Score na startoplossing: {(oplossing.penalty + oplossing.tijd) / 60}");
+            Console.WriteLine($"Penalty: {oplossing.penalty}");
+            Console.WriteLine($"Tijd: {oplossing.tijd}");
+
+
+            // Simulated Annealing
+            // Either add/remove/swap action
+            // Need one index for remove and 2 for swap
+
+
             Stopwatch timer = new Stopwatch();
             timer.Start();
-            oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
+
+            int z = 0; 
+            while (z < 5000000)
+            {
+                if (z % Q == 0) // Decrease T every Q iterations by factorizing with a
+                {
+                    T = T * a;
+                }
+
+                int action = rnd.Next(3);
+                if (action == 0) // swap
+                {
+                    int? index1 = oplossing.pickRandomStop();
+                    int? index2 = oplossing.pickRandomStop();
+
+                    if (index1 == null || index1 == index2)
+                    {
+                        continue;
+                    }
+
+                    int i1 = (int)index1;
+                    int i2 = (int)index2;
+
+                    CollectionStop s1 = oplossing.stops[i1];
+                    CollectionStop s2 = oplossing.stops[i2];
+
+                    if (ConsiderSwap(s1, s2, out float s1Diff, out float s2Diff, out float timeDiff, out float penaltyDiff, out int loadDiff1, out int loadDiff2))
+                    {
+                        s1.dayStop.dayTime += s1Diff;
+                        s2.dayStop.dayTime += s2Diff;
+                        s1.ofloadStop.volume += loadDiff1;
+                        s2.ofloadStop.volume += loadDiff2;
+
+                        oplossing.tijd += timeDiff;
+                        oplossing.penalty += penaltyDiff;
+                        oplossing.Swap(s1, s2);
+                    }
+
+                }
+
+                else if (action == 1) // add
+                {
+
+                    int? indexIgnore = oplossing.pickRandomIgnoredStop();
+                    int? indexInsert = oplossing.pickRandomStop();
+
+                    if (indexIgnore == null) 
+                    {
+                        continue;
+                    }
+
+
+                    CollectionStop insertNode = oplossing.stops[(int)indexInsert];
+                    CollectionStop newStop = oplossing.ignore[(int)indexIgnore];
+
+
+                    if (ConsiderAdd(insertNode, newStop, out float timeDiff, out float penaltyDiff))
+                    {
+                        insertNode.dayStop.dayTime += timeDiff;
+                        insertNode.ofloadStop.volume += (newStop.containerVolume * newStop.containerCount);
+                        oplossing.tijd += timeDiff;
+                        oplossing.penalty += penaltyDiff;
+                        oplossing.Insert(insertNode, newStop);
+                        oplossing.AddStop((int)indexIgnore);
+                    }
+
+
+                }
+
+                else if (action == 2) // remove
+                {
+                    int? indexRemove = oplossing.pickRandomStop();
+
+                    if (indexRemove == null)
+                    {
+                        continue;
+                    }
+
+                    CollectionStop removeStop = oplossing.stops[(int)indexRemove];
+
+                    if (ConsiderRemove(removeStop, out float timeDiff, out float penaltyDiff))
+                    {
+                        removeStop.dayStop.dayTime += timeDiff;
+                        removeStop.ofloadStop.volume -= (removeStop.containerCount * removeStop.containerVolume);
+                        oplossing.tijd += timeDiff;
+                        oplossing.penalty += penaltyDiff;
+                        oplossing.Remove(removeStop);
+                        oplossing.RemoveStop((int)indexRemove);
+                    }
+                }
+
+                z++;
+            }
+
+
             timer.Stop();
 
             Console.WriteLine($"Duration: {timer.Elapsed}");
-            Console.WriteLine($"Score na startoplossing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            oplossing.OutputSolution();
-            
 
+            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
+            Console.WriteLine($"Penalty: {oplossing.penalty}");
+            Console.WriteLine($"Tijd: {oplossing.tijd}");
+            oplossing.OutputSolution();
+
+        }
+
+        private bool ConsiderRemove(CollectionStop removeNode, out float timeDiff, out float penaltyDiff)
+        {
+            // calculate difference in duration
+            timeDiff = -(removeNode.loadingTime + afstandenMatrix[removeNode.prev.matrixId, removeNode.matrixId, 1]
+                                                  + afstandenMatrix[removeNode.matrixId, removeNode.next.matrixId, 1]
+                                                  - afstandenMatrix[removeNode.prev.matrixId, removeNode.next.matrixId, 1]);
+
+            if (oplossing.CorrectPickup(removeNode))
+            {
+                penaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
+            }
+            else penaltyDiff = 0;
+
+            float scoreDiff = timeDiff + penaltyDiff;
+
+            if (scoreDiff <= 0) // if the change is an improvement follow through
+            {
+                return true;
+            }
+            else if (RollChance(scoreDiff)) // if the chance roll returns true, follow through
+            {
+                return true;
+            }
+
+            return false; // else don't follow through
 
         }
 
 
-    //    private bool ConsiderRemove(List<CollectionStop> stopsAuto)
-    //    {
-    //        // pick random stop to remove from stops(list)
-    //        int? i = oplossing.pickRandomStop(stopsAuto);
-    //        if (!i.HasValue) { return false; } // cancel if stops(list) was empty
-    //        int index = (int)i;
-    //        Stop stop = stopsAuto[index];
+        private bool ConsiderAdd(CollectionStop insertNode, CollectionStop newStop, out float timeDiff, out float penaltyDiff)
+        {
+            timeDiff = 0;
+            penaltyDiff = 0;
+            if ((insertNode.ofloadStop.volume + newStop.containerCount * newStop.containerVolume) > oplossing.cargoSpace)
+            {
+                return false;
+            }
 
-    //        // add null protection for when stop.prev/next is null --!!
-    //        int currentMId = stop.matrixId;
-    //        int prevMId = stop.prev.matrixId;
-    //        int nextMId = stop.next.matrixId;
+            timeDiff = newStop.loadingTime + afstandenMatrix[insertNode.matrixId, newStop.matrixId, 1]
+                                           + afstandenMatrix[newStop.matrixId, insertNode.next.matrixId, 1]
+                                           - afstandenMatrix[insertNode.matrixId, insertNode.next.matrixId, 1];
+            if ( timeDiff + insertNode.dayStop.dayTime > oplossing.maxDayTime)
+            {
+                return false;
+            }
 
-    //        // calculate difference in duration
-    //        int currentDuration = afstandenMatrix[prevMId, currentMId, 1] + afstandenMatrix[currentMId, nextMId, 1];
-    //        int durationAfterChange = afstandenMatrix[prevMId, nextMId, 1];
-    //        int timeDiff = durationAfterChange - currentDuration;
+            if (oplossing.CorrectPickup(newStop, insertNode.dayStop.day, true))
+            {
+                penaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
+            }
 
-    //        if (timeDiff <= 0) // if the change is an improvement follow through
-    //        {
-    //            oplossing.RemoveStop(stopsAuto, stop, index);
-    //            return true;
-    //        }
-    //        else if (RollChance(timeDiff)) // if the chance roll returns true, follow through
-    //        {
-    //            oplossing.RemoveStop(stopsAuto, stop, index);
-    //            return true;
-    //        }
+            float scoreDiff = penaltyDiff + timeDiff;
 
-    //        return false; // else don't follow through
+            if (scoreDiff <= 0) return true;
+            else if (RollChance(scoreDiff))
+            {
+                return true;
+            }
+            else return false;
 
-    //    }
+        }
 
-    //    private bool RollChance(int diff)
-    //    {
-    //        double result = Math.Exp(diff / T);
-    //        return rndDouble.NextDouble() < result;
-    //    }
+
+        private bool ConsiderSwap(CollectionStop s1, CollectionStop s2, out float s1Diff, out float s2Diff, out float timeDiff, out float penaltyDiff, out int loadDiff1, out int loadDiff2)
+        {
+            penaltyDiff = 0;
+            loadDiff1 = 0;
+            loadDiff2 = 0;
+
+            // get values from objects
+            int oudNaarS1 = afstandenMatrix[s1.prev.matrixId, s1.matrixId, 1];
+            int oudVanS1 = afstandenMatrix[s1.matrixId, s1.next.matrixId, 1];
+            int oudNaarS2 = afstandenMatrix[s2.prev.matrixId, s2.matrixId, 1];
+            int oudVanS2 = afstandenMatrix[s2.matrixId, s2.next.matrixId, 1];
+            float s1Tijd = s1.loadingTime;
+
+            int nieuwNaarS1 = afstandenMatrix[s2.prev.matrixId, s1.matrixId, 1];
+            int nieuwVanS1 = afstandenMatrix[s1.matrixId, s2.next.matrixId, 1];
+            int nieuwNaarS2 = afstandenMatrix[s1.prev.matrixId, s2.matrixId, 1];
+            int nieuwVanS2 = afstandenMatrix[s2.matrixId, s1.next.matrixId, 1];
+            float s2Tijd = s2.loadingTime;
+
+            // reject if doesnt fit in dayTime or cargoSpace
+            s1Diff = (s2Tijd - s1Tijd) + (nieuwNaarS2 - oudNaarS1) + (nieuwVanS2 - oudVanS1);
+            s2Diff = (s1Tijd - s2Tijd) + (nieuwNaarS1 - oudNaarS2) + (nieuwVanS1 - oudVanS2);
+            timeDiff = s1Diff + s2Diff;
+            if (s1.dayStop.day == s2.dayStop.day && s1.dayStop.dayTime + s1Diff + s2Diff > oplossing.maxDayTime) return false;
+            if (s1.dayStop.dayTime + s1Diff > oplossing.maxDayTime ||
+                s2.dayStop.dayTime + s2Diff > oplossing.maxDayTime) return false;
+            loadDiff1 = s2.ofloadStop.volume - s1.ofloadStop.volume;
+            loadDiff2 = -loadDiff1;
+            if (s1.ofloadStop.volume + loadDiff1 > oplossing.cargoSpace ||
+                s2.ofloadStop.volume + loadDiff2 > oplossing.cargoSpace) return false;
+
+            //calculate diff by penalties
+            float penaltyDiff1 = 0;
+            float penaltyDiff2 = 0;
+
+            if (!(s1.orderId == s2.orderId))
+            {
+                bool b1 = oplossing.CorrectPickup(s1);
+                bool b2 = oplossing.CorrectPickup(s2);
+
+                bool nieuwB1 = oplossing.CorrectPickup(s1, s2.dayStop.day);
+                bool nieuwB2 = oplossing.CorrectPickup(s2, s1.dayStop.day);
+
+                if (b1 && !nieuwB1) penaltyDiff1 = s1.loadingTime * s1.frequency * 3;
+                else if (!b1 && nieuwB1) penaltyDiff1 = -(s1.loadingTime * s1.frequency * 3);
+                if (b2 && !nieuwB2) penaltyDiff2 = s2.loadingTime * s2.frequency * 3;
+                else if (!b2 && nieuwB2) penaltyDiff2 = -(s2.loadingTime * s2.frequency * 3);
+            }
+            penaltyDiff = penaltyDiff1 + penaltyDiff2;
+            float scoreDiff = penaltyDiff1 + penaltyDiff2 + s1Diff + s2Diff;
+
+            if (scoreDiff <= 0) return true;
+            else if (RollChance(scoreDiff))
+            {
+                return true;
+            }
+            else return false;
+
+        }
+
+        private bool RollChance(float diff)
+        {
+            double result = Math.Exp((-diff) / T);
+            return rnd.NextDouble() < result;
+        }
 
 
     }

@@ -61,7 +61,7 @@ namespace GroteOPTOpdracht
                 int containerCount = int.Parse(results[3]);
                 int containerVolume = int.Parse(results[4]);
                 float loadingTime = float.Parse(results[5]); //in minutes
-                penalty += (loadingTime * 60); //accumulate penalty
+                penalty += (loadingTime * 3 * 60 * frequency); //accumulate penalty
                 int matrixId = int.Parse(results[6]);
                 int XCoordinate = int.Parse(results[7]);
                 int YCoordinate = int.Parse(results[8]);
@@ -72,7 +72,7 @@ namespace GroteOPTOpdracht
                     {
 
                         CollectionStop s = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
-                                             containerVolume, loadingTime,
+                                             containerVolume, (loadingTime * 60),
                                              XCoordinate, YCoordinate);
                         stops[i] = s;
                         orderList.Add(s);
@@ -96,7 +96,7 @@ namespace GroteOPTOpdracht
                 else //if a single stop is required simply add that one
                 {
                     CollectionStop stop = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
-                                         containerVolume, loadingTime,
+                                         containerVolume, loadingTime * 60,
                                          XCoordinate, YCoordinate);
                     orderList.Add(stop);
 
