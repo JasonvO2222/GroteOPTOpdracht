@@ -33,8 +33,6 @@ namespace GroteOPTOpdracht
             // Simulated Annealing
             // Either add/remove/swap action
             // Need one index for remove and 2 for swap
-            oplossing.OutputSolution();
-
 
             Stopwatch timer = new Stopwatch();
             timer.Start();
@@ -140,6 +138,8 @@ namespace GroteOPTOpdracht
             Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
             Console.WriteLine($"Penalty: {oplossing.penalty}");
             Console.WriteLine($"Tijd: {oplossing.tijd}");
+            oplossing.OutputSolution();
+
 
         }
 
