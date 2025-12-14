@@ -72,7 +72,7 @@ namespace GroteOPTOpdracht
                     {
 
                         CollectionStop s = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
-                                             containerVolume, (loadingTime * 60),
+                                             containerVolume, (loadingTime * 60), // *60 to convert to seconds
                                              XCoordinate, YCoordinate);
                         stops[i] = s;
                         orderList.Add(s);

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GroteOPTOpdracht
 {
-    public class Stop
+    public class Stop //Stop superclass that form the nodes in the linkedlist
     {
 
         public Stop? next;
@@ -18,10 +18,10 @@ namespace GroteOPTOpdracht
         }
     }
 
-    public class OfloadStop : Stop
+    public class OfloadStop : Stop //Stop at ofloading station
     {
-        public int volume;
-        public OfloadStop? nextOfloadStop;
+        public int volume; // track how much volume is accumulated for before this stop
+        public OfloadStop? nextOfloadStop; // track the next ofloadStop in case you want to remove a stop (edit: dont think this is necessary)
 
         public OfloadStop(int volume) : base (287)
         {
@@ -29,10 +29,10 @@ namespace GroteOPTOpdracht
         }
     }
 
-    public class DayStop : Stop
+    public class DayStop : Stop // divider node for when day is finished
     {
         public string day;
-        public float dayTime;
+        public float dayTime; // track how much time is spent in this day driving and loading/ofloading
 
         public DayStop(string day, int dagTijd) : base (287)
         {
@@ -41,14 +41,14 @@ namespace GroteOPTOpdracht
         }
     }
 
-    public class CollectionStop : Stop
+    public class CollectionStop : Stop // Companay stop where the trucks pick up trash
     {
 
-        public CollectionStop[]? siblings;
-        public DayStop? dayStop;
-        public OfloadStop? ofloadStop;
+        public CollectionStop[]? siblings; // if order with freq > 1 track order node copies (siblings)
+        public DayStop? dayStop; // track which day the stop is on
+        public OfloadStop? ofloadStop; // track at which ofload stop node/moment the trash picked upo will be dumped
 
-        public bool included;
+        public bool included; // bool to quicly check if node is included in solution
         public int orderId { get; set; }
         public string place;
         public int frequency;
