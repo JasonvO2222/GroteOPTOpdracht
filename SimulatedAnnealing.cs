@@ -12,13 +12,13 @@ namespace GroteOPTOpdracht
         private double T; //chance variable
         private float a = 0.98f; //chance var factor 
         private int Q = 100000; // iterations before factorizing
-        private int zLim = 5000000; // total iterations
+        private long zLim = 5000000; // total iterations
         private readonly int[,,] afstandenMatrix;
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceFactor, int iterationsBeforeFactorizing, int totalIterations)
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceFactor, int iterationsBeforeFactorizing, long totalIterations)
         {
             afstandenMatrix = matrix;
             orderList = list;
@@ -26,22 +26,15 @@ namespace GroteOPTOpdracht
             a = chanceFactor;
             Q = iterationsBeforeFactorizing;
             zLim = totalIterations;
-            Console.WriteLine($"Score voor startoplossing: {(penalty)}");
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
-
-            Console.WriteLine($"Score na startoplossing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
 
 
             // Simulated Annealing
             // Either add/remove/swap action
             // Need one index for remove and 2 for swap
 
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
 
-            int z = 1; 
+            long z = 1; 
             while (z <= zLim)
             {
                 if (z % Q == 0) // Decrease T every Q iterations by factorizing with a
@@ -134,19 +127,6 @@ namespace GroteOPTOpdracht
 
                 z++;
             }
-
-
-            timer.Stop();
-
-            Console.WriteLine($"Duration: {timer.Elapsed}");
-
-            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
-            oplossing.OutputSolution();
-            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
 
 
         }
@@ -312,6 +292,13 @@ namespace GroteOPTOpdracht
             return rnd.NextDouble() < result;
         }
 
-
+        public double GetScore()
+        {
+            return (oplossing.tijd + oplossing.penalty) / 60;
+        }
+        public void OutputSolution()
+        {
+            oplossing.OutputSolution();
+        }
     }
 }

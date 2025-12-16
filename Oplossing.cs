@@ -262,7 +262,7 @@ namespace GroteOPTOpdracht
                     counter++;
                 }
                 s = s.next;
-                Console.WriteLine(line);
+                //Console.WriteLine(line);
             }
 
             sW.Close();
