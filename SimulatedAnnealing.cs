@@ -12,16 +12,20 @@ namespace GroteOPTOpdracht
         private double T; //chance variable
         private float a = 0.98f; //chance var factor 
         private int Q = 100000; // iterations before factorizing
+        private int zLim = 5000000; // total iterations
         private readonly int[,,] afstandenMatrix;
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty)
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceFactor, int iterationsBeforeFactorizing, int totalIterations)
         {
             afstandenMatrix = matrix;
             orderList = list;
-            T = 1;
+            T = chanceVar;
+            a = chanceFactor;
+            Q = iterationsBeforeFactorizing;
+            zLim = totalIterations;
             Console.WriteLine($"Score voor startoplossing: {(penalty)}");
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
@@ -38,7 +42,7 @@ namespace GroteOPTOpdracht
             timer.Start();
 
             int z = 1; 
-            while (z <= 5000000)
+            while (z <= zLim)
             {
                 if (z % Q == 0) // Decrease T every Q iterations by factorizing with a
                 {
@@ -48,7 +52,7 @@ namespace GroteOPTOpdracht
                 int action = rnd.Next(3);
                 if (action == 0) // swap
                 {
-                    continue;
+                    
                     int? index1 = oplossing.pickRandomStop();
                     int? index2 = oplossing.pickRandomStop();
 

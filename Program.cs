@@ -106,7 +106,7 @@ namespace GroteOPTOpdracht
             orders.Close();
 
             // Pass data to SimulatedAnnealing class
-            new SimulatedAnnealing(afstandenMatrix,  orderList, penalty);
+            new SimulatedAnnealing(afstandenMatrix,  orderList, penalty, 1f, 0.98f, 100000, 5000000);
 
         }
 
