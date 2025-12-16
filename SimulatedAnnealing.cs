@@ -139,6 +139,9 @@ namespace GroteOPTOpdracht
             Console.WriteLine($"Penalty: {oplossing.penalty}");
             Console.WriteLine($"Tijd: {oplossing.tijd}");
             oplossing.OutputSolution();
+            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
+            Console.WriteLine($"Penalty: {oplossing.penalty}");
+            Console.WriteLine($"Tijd: {oplossing.tijd}");
 
 
         }
@@ -244,18 +247,19 @@ namespace GroteOPTOpdracht
 
             
 
-            if (s1.next == s2) // if adjacent stop1 -> stop2
-            {               // Nieuw - Oud
+            if (s1.next == s2) // if adjacent stop1.p -> stop1 -> stop2 -> stop2.n
+            {
+                // Nieuw - Oud
                 s1Diff = (nieuwNaarS2 - oudNaarS1) + (nieuwVanS1 - oudVanS2) + (afstandenMatrix[s2.matrixId, s2.prev.matrixId, 1] - oudVanS1);
                 s2Diff = 0; // (stop1.p -> stop2) + (stop1 -> stop2.n) + (stop2 -> stop1) - (stop1.p -> stop1) - (stop2 -> stop2.n) - (stop1 -> stop1.n)
                 timeDiff = s1Diff;
 
             }
-            else if (s2.next == s1)
+            else if (s2.next == s1) // if adjacent stop2.p -> stop2 -> stop1 -> stop1.n
             {
                 s1Diff = 0;
                 s2Diff = (nieuwNaarS1 - oudNaarS2) + (nieuwVanS2 - oudVanS1) + (afstandenMatrix[s1.matrixId, s1.prev.matrixId, 1] - oudVanS2);
-                timeDiff = s1Diff; // (stop2.p -> stop1) + (stop2 -> stop1.n) + (stop1 -> stop2) - (stop2.p -> stop2) - (stop1 -> stop1.n) - (stop2 -> stop2.n)
+                timeDiff = s2Diff; // (stop2.p -> stop1) + (stop2 -> stop1.n) + (stop1 -> stop2) - (stop2.p -> stop2) - (stop1 -> stop1.n) - (stop2 -> stop2.n)
             }
             else // otherwise
             {
@@ -286,7 +290,7 @@ namespace GroteOPTOpdracht
                 else if (!b2 && nieuwB2) penaltyDiff2 = -(s2.loadingTime * s2.frequency * 3);
             }
             penaltyDiff = penaltyDiff1 + penaltyDiff2;
-            float scoreDiff = penaltyDiff + s1Diff + s2Diff;
+            float scoreDiff = penaltyDiff + timeDiff;
 
             if (scoreDiff <= 0) return true; //accept if better and roll chance if not
             else if (RollChance(scoreDiff))
