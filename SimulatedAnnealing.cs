@@ -22,7 +22,7 @@ namespace GroteOPTOpdracht
             afstandenMatrix = matrix;
             orderList = list;
             T = 1;
-            Console.WriteLine($"Score voor startoplossing: {(penalty) / 60}");
+            Console.WriteLine($"Score voor startoplossing: {(penalty)}");
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
             Console.WriteLine($"Score na startoplossing: {(oplossing.penalty + oplossing.tijd) / 60}");
@@ -48,6 +48,7 @@ namespace GroteOPTOpdracht
                 int action = rnd.Next(3);
                 if (action == 0) // swap
                 {
+                    continue;
                     int? index1 = oplossing.pickRandomStop();
                     int? index2 = oplossing.pickRandomStop();
 

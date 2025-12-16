@@ -21,7 +21,7 @@ namespace GroteOPTOpdracht
         public int maxDayTime = 43200; //max minutes in a day
         public DayStop leftMostDayStop; //track the startnode in the linkedList
 
-        public Oplossing(List<CollectionStop> orderList, int[,,] afstandenMatrix, float penalty)
+        public Oplossing(List<CollectionStop> orderList, int[,,] afstandenMatrix, float pen)
         {
 
             //initially ignore all stops
@@ -37,7 +37,7 @@ namespace GroteOPTOpdracht
 
             // setup other vars
             stops = new List<CollectionStop>();
-            this.penalty = penalty;
+            penalty = pen;
             tijd = 0;
 
 
@@ -63,7 +63,6 @@ namespace GroteOPTOpdracht
                     dayStops[i].prev = dayStops[i - 1];
                 }
             }
-
 
             // fill each day to the max with stops as a starting solution
             bool ignoreEmpty = false;
@@ -227,9 +226,9 @@ namespace GroteOPTOpdracht
             stops.RemoveAt(c);
         }
 
-        public void OutputSolution()
+        public void OutputSolution(string path = "Resultaat.txt")
         {
-            StreamWriter sW = new StreamWriter("Resultaat.txt");
+            StreamWriter sW = new StreamWriter(path);
             Stop s = leftMostDayStop.next; // get first node
 
             int counter = 1;
