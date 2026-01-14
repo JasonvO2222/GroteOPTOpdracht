@@ -59,15 +59,15 @@ namespace GroteOPTOpdracht
             // optimize parameters
             float[] Tlist = new float[3] { 46, 48, 50 };
             float[] aList = new float[3] { 0.985f, 0.90f, 0.995f};
-            int[] qList = new int[3] { 100000, 200000, 1000000};
+            int[] TMinlist = new int[3] { 20, 40, 60};
             int[] totalList = new int[3] { 80000000, 100000000, 120000000};
 
-            int totalParameterCombinations = Tlist.Length * aList.Length * qList.Length * totalList.Length;
+            int totalParameterCombinations = Tlist.Length * aList.Length * TMinlist.Length * totalList.Length;
 
 
             float T = 0;
             float a = 0;
-            int q = 0;
+            int Tmin = 0;
             int total = 0;
 
             float aT = 0;
@@ -86,7 +86,7 @@ namespace GroteOPTOpdracht
 
                 for (int indexA = 0; indexA < aList.Length; indexA++)
                 {
-                    for (int indexQ = 0; indexQ < qList.Length; indexQ++)
+                    for (int indexTMin = 0; indexTMin < TMinlist.Length; indexTMin++)
                     {
                         for (int indexT = 0; indexT < Tlist.Length; indexT++)
                         {
@@ -94,7 +94,7 @@ namespace GroteOPTOpdracht
 
                             Console.WriteLine($"{counter}/{totalParameterCombinations}; 1/3; ({indexTotal+1}/{totalList.Length})");
                             SimulatedAnnealing s1 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], aList[indexA], qList[indexQ], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
                             double score1 = s1.GetScore();
 
 
@@ -106,7 +106,7 @@ namespace GroteOPTOpdracht
 
                                 T = Tlist[indexT];
                                 a = aList[indexA];
-                                q = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 total = totalList[indexTotal];
                             }
 
@@ -116,7 +116,7 @@ namespace GroteOPTOpdracht
                             ls = CreateObjectList();
 
                             SimulatedAnnealing s2 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], aList[indexA], qList[indexQ], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
                             double score2 = s2.GetScore();
 
 
@@ -127,7 +127,7 @@ namespace GroteOPTOpdracht
 
                                 T = Tlist[indexT];
                                 a = aList[indexA];
-                                q = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 total = totalList[indexTotal];
                             }
 
@@ -136,7 +136,7 @@ namespace GroteOPTOpdracht
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s3 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], aList[indexA], qList[indexQ], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
                             double score3 = s3.GetScore();
 
 
@@ -147,13 +147,13 @@ namespace GroteOPTOpdracht
 
                                 T = Tlist[indexT];
                                 a = aList[indexA];
-                                q = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 total = totalList[indexTotal];
                             }
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s4 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], aList[indexA], qList[indexQ], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
                             double score4 = s4.GetScore();
 
 
@@ -164,13 +164,13 @@ namespace GroteOPTOpdracht
 
                                 T = Tlist[indexT];
                                 a = aList[indexA];
-                                q = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 total = totalList[indexTotal];
                             }
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s5 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], aList[indexA], qList[indexQ], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
                             double score5 = s4.GetScore();
 
 
@@ -181,7 +181,7 @@ namespace GroteOPTOpdracht
 
                                 T = Tlist[indexT];
                                 a = aList[indexA];
-                                q = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 total = totalList[indexTotal];
                             }
 
@@ -191,7 +191,7 @@ namespace GroteOPTOpdracht
                                 bestAverage = (score1 + score2 + score3 + score4 + score5) / 5;
                                 aT = Tlist[indexT];
                                 aa = aList[indexA];
-                                aq = qList[indexQ];
+                                Tmin = TMinlist[indexTMin];
                                 atotal = totalList[indexTotal];
 
                             }
@@ -213,7 +213,7 @@ namespace GroteOPTOpdracht
             Console.WriteLine($"Settings for best route: {best}");
             Console.WriteLine($"starting T value: {T}");
             Console.WriteLine($"alpha value: {a}");
-            Console.WriteLine($"iteration before alpha: {q}");
+            //Console.WriteLine($"iteration before alpha: {q}");
             Console.WriteLine($"iteration total: {total}");
 
 
