@@ -19,7 +19,7 @@ namespace GroteOPTOpdracht
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, int totalIterations)
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations)
         {
             afstandenMatrix = matrix;
             orderList = list;
@@ -29,22 +29,15 @@ namespace GroteOPTOpdracht
             zLim = totalIterations;
             Q = (int)(totalIterations/(Math.Log(T_min / T, a)));
 
-            Console.WriteLine($"Score voor startoplossing: {(penalty)}");
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
-
-            Console.WriteLine($"Score na startoplossing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
 
 
             // Simulated Annealing
             // Either add/remove/swap action
             // Need one index for remove and 2 for swap
 
-            Stopwatch timer = new Stopwatch();
-            timer.Start();
 
-            int z = 1;
+            long z = 1;
             bool TFlag = true;
             while (z <= zLim)
             {
@@ -143,19 +136,6 @@ namespace GroteOPTOpdracht
 
                 z++;
             }
-
-
-            timer.Stop();
-
-            Console.WriteLine($"Duration: {timer.Elapsed}");
-
-            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
-            oplossing.OutputSolution();
-            Console.WriteLine($"Score na simulated annealing: {(oplossing.penalty + oplossing.tijd) / 60}");
-            Console.WriteLine($"Penalty: {oplossing.penalty}");
-            Console.WriteLine($"Tijd: {oplossing.tijd}");
 
 
         }
@@ -321,6 +301,13 @@ namespace GroteOPTOpdracht
             return rnd.NextDouble() < result;
         }
 
-
+        public double GetScore()
+        {
+            return (oplossing.tijd + oplossing.penalty) / 60;
+        }
+        public void OutputSolution()
+        {
+            oplossing.OutputSolution();
+        }
     }
 }
