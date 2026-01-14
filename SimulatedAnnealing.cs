@@ -9,23 +9,26 @@ namespace GroteOPTOpdracht
 {
     public class SimulatedAnnealing
     {
-        private double T; //chance variable
+        private double T = 900; //chance variable
+        private double T_min = 20; // lowest value for T
         private float a = 0.98f; //chance var factor 
         private int Q = 100000; // iterations before factorizing
-        private int zLim = 5000000; // total iterations
+        private long zLim = 5000000; // total iterations
         private readonly int[,,] afstandenMatrix;
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceFactor, int iterationsBeforeFactorizing, int totalIterations)
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, int totalIterations)
         {
             afstandenMatrix = matrix;
             orderList = list;
             T = chanceVar;
+            T_min = chanceVarMin;
             a = chanceFactor;
-            Q = iterationsBeforeFactorizing;
             zLim = totalIterations;
+            Q = (int)(totalIterations/(Math.Log(T_min / T, a)));
+
             Console.WriteLine($"Score voor startoplossing: {(penalty)}");
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
@@ -41,12 +44,18 @@ namespace GroteOPTOpdracht
             Stopwatch timer = new Stopwatch();
             timer.Start();
 
-            int z = 1; 
+            int z = 1;
+            bool TFlag = true;
             while (z <= zLim)
             {
-                if (z % Q == 0) // Decrease T every Q iterations by factorizing with a
+                if (TFlag && z % Q == 0) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
                     T = T * a;
+                    if (T < 20) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
+                    {
+                        TFlag = false;
+                        T = 20;
+                    }
                 }
 
                 int action = rnd.Next(3);
