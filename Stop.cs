@@ -33,18 +33,20 @@ namespace GroteOPTOpdracht
     {
         public string day;
         public float dayTime; // track how much time is spent in this day driving and loading/ofloading
+        public int truckId;
 
-        public DayStop(string day, int dagTijd) : base (287)
+        public DayStop(string day, int dagTijd, int truckID) : base (287)
         {
             this.day = day;
             this.dayTime = dagTijd;
+            this.truckId = truckID;
         }
     }
 
     public class CollectionStop : Stop // Companay stop where the trucks pick up trash
     {
 
-        public CollectionStop[]? siblings; // if order with freq > 1 track order node copies (siblings)
+        public CollectionStop[] siblings; // if order with freq > 1 track order node copies (siblings)
         public DayStop? dayStop; // track which day the stop is on
         public OfloadStop? ofloadStop; // track at which ofload stop node/moment the trash picked upo will be dumped
 
@@ -57,6 +59,7 @@ namespace GroteOPTOpdracht
         public float loadingTime;
         public int XCoordinate;
         public int YCoordinate;
+        public int index;
 
 
         public CollectionStop(int MId, int id, string plce, int freq, int contCount, int contVol, float loadTime, int XCoord, int YCoord) : base(MId)
@@ -68,6 +71,8 @@ namespace GroteOPTOpdracht
             this.containerVolume = contVol;
             this.loadingTime = loadTime;
             this.included = false;
+            siblings = new CollectionStop[frequency - 1];
+            index = -1;
         }
     }
 

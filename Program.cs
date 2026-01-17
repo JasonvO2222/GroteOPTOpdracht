@@ -45,15 +45,20 @@ namespace GroteOPTOpdracht
 
 
             // run
+            Console.WriteLine("Check");
 
             float penalty = 640760.4f;
+            List<CollectionStop> ls = CreateObjectList();
 
-            //SimulatedAnnealing sa = new SimulatedAnnealing(afstandenMatrix,
-            //    orderList, penalty, 1, 0.985f, 1000, 5000000);
-            //double score = sa.GetScore();
-            //sa.OutputSolution();
-            //Console.WriteLine($"{score}");
-            //return;
+            SimulatedAnnealing sa = new SimulatedAnnealing(afstandenMatrix,
+                ls, penalty, 600, 20, 0.985f, 100000, 1000);
+            double score = sa.GetScore();
+            sa.OutputSolution();
+            Console.WriteLine($"{score}");
+            return;
+
+
+
 
 
             // optimize parameters
@@ -61,6 +66,7 @@ namespace GroteOPTOpdracht
             float[] aList = new float[3] { 0.985f, 0.90f, 0.995f};
             int[] TMinlist = new int[3] { 20, 40, 60};
             int[] totalList = new int[3] { 80000000, 100000000, 120000000};
+            int iterationsTConstant = 100000;
 
             int totalParameterCombinations = Tlist.Length * aList.Length * TMinlist.Length * totalList.Length;
 
@@ -90,11 +96,11 @@ namespace GroteOPTOpdracht
                     {
                         for (int indexT = 0; indexT < Tlist.Length; indexT++)
                         {
-                            List<CollectionStop> ls = CreateObjectList();
+                            ls = CreateObjectList();
 
                             Console.WriteLine($"{counter}/{totalParameterCombinations}; 1/3; ({indexTotal+1}/{totalList.Length})");
                             SimulatedAnnealing s1 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
                             double score1 = s1.GetScore();
 
 
@@ -116,7 +122,7 @@ namespace GroteOPTOpdracht
                             ls = CreateObjectList();
 
                             SimulatedAnnealing s2 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
                             double score2 = s2.GetScore();
 
 
@@ -136,7 +142,7 @@ namespace GroteOPTOpdracht
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s3 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
                             double score3 = s3.GetScore();
 
 
@@ -153,7 +159,7 @@ namespace GroteOPTOpdracht
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s4 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
                             double score4 = s4.GetScore();
 
 
@@ -170,7 +176,7 @@ namespace GroteOPTOpdracht
 
                             ls = CreateObjectList();
                             SimulatedAnnealing s5 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal]);
+                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
                             double score5 = s4.GetScore();
 
 
@@ -294,6 +300,7 @@ namespace GroteOPTOpdracht
                     CollectionStop stop = new CollectionStop(matrixId, orderId, place, frequency, containerCount,
                                          containerVolume, loadingTime * 60,
                                          XCoordinate, YCoordinate);
+
                     orderList.Add(stop);
 
                 }

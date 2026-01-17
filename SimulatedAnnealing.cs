@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -18,16 +20,23 @@ namespace GroteOPTOpdracht
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
+        private readonly List<string> days = new List<string>{ "monday", "tuesday", "wednesday", "thursday", "friday" };
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations)
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations, int iterationsTConstant)
         {
+            if (totalIterations <= iterationsTConstant) { 
+                Console.WriteLine("totalIterations cannot be less than (or equal to) iterationsTConstant");
+                return;
+            }
             afstandenMatrix = matrix;
             orderList = list;
             T = chanceVar;
             T_min = chanceVarMin;
             a = chanceFactor;
             zLim = totalIterations;
-            Q = (int)(totalIterations/(Math.Log(T_min / T, a)));
+            Q = (int)((totalIterations-iterationsTConstant)/(Math.Log(T_min / T, a)));
+            Console.WriteLine(Q);
+
 
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
@@ -36,12 +45,41 @@ namespace GroteOPTOpdracht
             // Either add/remove/swap action
             // Need one index for remove and 2 for swap
 
-
             long z = 1;
             bool TFlag = true;
             while (z <= zLim)
             {
-                if (TFlag && z % Q == 0) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
+
+                //Console.WriteLine("m0");
+                //Console.WriteLine(oplossing.monday0.Count);
+                //Console.WriteLine("m1");
+                //Console.WriteLine(oplossing.monday1.Count);
+                //Console.WriteLine("t0");
+                //Console.WriteLine(oplossing.tuesday0.Count);
+                //Console.WriteLine("t1");
+                //Console.WriteLine(oplossing.tuesday1.Count);
+                //Console.WriteLine("w0");
+                //Console.WriteLine(oplossing.wednesday0.Count);
+                //Console.WriteLine("w1");
+                //Console.WriteLine(oplossing.wednesday1.Count);
+                //Console.WriteLine("t0");
+                //Console.WriteLine(oplossing.thursday0.Count);
+                //Console.WriteLine("t1");
+                //Console.WriteLine(oplossing.thursday1.Count);
+                //Console.WriteLine("f0");
+                //Console.WriteLine(oplossing.friday0.Count);
+                //Console.WriteLine("f1");
+                //Console.WriteLine(oplossing.friday1.Count);
+                //Console.WriteLine("total");
+                //Console.WriteLine(oplossing.monday0.Count + oplossing.monday1.Count + oplossing.tuesday0.Count + oplossing.tuesday1.Count +
+                //   oplossing.wednesday0.Count + oplossing.wednesday1.Count + oplossing.thursday0.Count + oplossing.thursday1.Count +
+                //   oplossing.friday0.Count + oplossing.friday1.Count);
+                //Console.WriteLine("ignore");
+                //Console.WriteLine(oplossing.ignore.Count);
+                //Console.ReadLine();
+
+
+                if (z % Q == 0 && TFlag) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
                     T = T * a;
                     if (T < 20) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
@@ -51,62 +89,112 @@ namespace GroteOPTOpdracht
                     }
                 }
 
+
+
+
                 int action = rnd.Next(3);
+                int rndInt;
                 if (action == 0) // swap
                 {
-                    
-                    int? index1 = oplossing.pickRandomStop();
-                    int? index2 = oplossing.pickRandomStop();
+                    //continue;
 
-                    if (index1 == null || index1 == index2)
+                    rndInt = rnd.Next(5);
+                    string day1 = days[rndInt];
+                    int stop1Truck = rnd.Next(2);
+                    List<CollectionStop> list1 = oplossing.MappingToList(day1, stop1Truck);
+                    int? index1 = oplossing.pickRandomStop(list1);
+                    if (index1 == null) { continue; }
+                    CollectionStop stop1 = list1[(int)index1];
+
+                    string day2 = "";
+                    int stop2Truck = rnd.Next(2);
+
+
+                    if (stop1.frequency == 3)
+                    {
+                        day2 = day1;
+                    }
+                    else if (stop1.frequency == 4)
+                    {
+                        int dayTotal = 10;
+                        foreach (CollectionStop c in stop1.siblings.Concat(new[] { stop1 }))
+                        {
+                            dayTotal -= MapDayToInt(c.dayStop.day);
+                        }
+                        day2 = (rnd.Next(2) == 1) ? day1 : days[dayTotal];
+                    }
+                    else if (stop1.frequency == 2)
+                    {
+                        //swapping both stops to a different day combination yet to be implemented (if at all)
+
+                        day2 = day1;
+                    }
+
+
+                    List<CollectionStop> list2 = oplossing.MappingToList(day2, stop2Truck);
+                    int? index2 = oplossing.pickRandomStop(list2);
+
+                    if (index1 == null || index2 == null || (index1 == index2 && list1 != list2))
+                    {
+                        continue;
+                    }
+                    CollectionStop stop2 = list2[(int)index2];
+                    if (day1 != day2 && stop2.frequency > 1)
                     {
                         continue;
                     }
 
-                    int i1 = (int)index1;
-                    int i2 = (int)index2;
 
-                    CollectionStop s1 = oplossing.stops[i1];
-                    CollectionStop s2 = oplossing.stops[i2];
 
-                    if (ConsiderSwap(s1, s2, out float s1Diff, out float s2Diff, out float timeDiff, out float penaltyDiff, out int loadDiff1, out int loadDiff2))
+                    if (ConsiderSwap(stop1, stop2, out float s1Diff, out float s2Diff, out float timeDiff, out int loadDiff1, out int loadDiff2))
                     {
-                        s1.dayStop.dayTime += s1Diff;
-                        s2.dayStop.dayTime += s2Diff;
-                        s1.ofloadStop.volume += loadDiff1;
-                        s2.ofloadStop.volume += loadDiff2;
+                        stop1.dayStop.dayTime += s1Diff;
+                        stop2.dayStop.dayTime += s2Diff;
+                        stop1.ofloadStop.volume += loadDiff1;
+                        stop2.ofloadStop.volume += loadDiff2;
 
                         oplossing.tijd += timeDiff;
-                        oplossing.penalty += penaltyDiff;
-                        oplossing.Swap(s1, s2);
+                        oplossing.Swap(stop1, stop2);
+                        oplossing.SwapStop(stop1, list1, stop2, list2);
                     }
 
                 }
 
                 else if (action == 1) // add
                 {
-
+                    //continue;
+                    
+                    Console.WriteLine("add");
                     int? indexIgnore = oplossing.pickRandomIgnoredStop();
-                    int? indexInsert = oplossing.pickRandomStop();
 
                     if (indexIgnore == null) 
                     {
                         continue;
                     }
 
-
-                    CollectionStop insertNode = oplossing.stops[(int)indexInsert];
                     CollectionStop newStop = oplossing.ignore[(int)indexIgnore];
 
-
-                    if (ConsiderAdd(insertNode, newStop, out float timeDiff, out float penaltyDiff))
+                                                            //stop to add, stop where isnert, timeDiff, list where to add
+                    if (ConsiderAdd(newStop, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff))
                     {
-                        insertNode.dayStop.dayTime += timeDiff;
-                        insertNode.ofloadStop.volume += (newStop.containerVolume * newStop.containerCount);
-                        oplossing.tijd += timeDiff;
+                        foreach (var v in stopsToAdd)
+                        {
+                            CollectionStop stop = v.Item1;
+                            CollectionStop insertLocNode = v.Item2;
+                            float timeDiff = v.Item3;
+                            insertLocNode.dayStop.dayTime += timeDiff;
+                            insertLocNode.ofloadStop.volume += (stop.containerVolume * stop.containerCount);
+                            oplossing.tijd += timeDiff;
+                            oplossing.Insert(insertLocNode, stop);
+                            oplossing.AddStop(stop, v.Item4);
+
+                            Console.WriteLine("add 1");
+                        }
                         oplossing.penalty += penaltyDiff;
-                        oplossing.Insert(insertNode, newStop);
-                        oplossing.AddStop((int)indexIgnore);
+                    }
+                    else
+                    {
+                        Console.WriteLine("fail");
                     }
 
 
@@ -114,23 +202,39 @@ namespace GroteOPTOpdracht
 
                 else if (action == 2) // remove
                 {
-                    int? indexRemove = oplossing.pickRandomStop();
+
+                    //continue;
+
+                    rndInt = rnd.Next(5);
+                    string day = days[rndInt];
+                    int stopTruck = rnd.Next(2);
+                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
+                    int? indexRemove = oplossing.pickRandomStop(ls);
 
                     if (indexRemove == null)
                     {
                         continue;
                     }
 
-                    CollectionStop removeStop = oplossing.stops[(int)indexRemove];
+                    CollectionStop removeStop = ls[(int)indexRemove];
 
-                    if (ConsiderRemove(removeStop, out float timeDiff, out float penaltyDiff))
+                    if (ConsiderRemove(removeStop, out float penaltyDiff, out (CollectionStop, float, List <CollectionStop>)[] stopsToRemove))
                     {
-                        removeStop.dayStop.dayTime += timeDiff;
-                        removeStop.ofloadStop.volume -= (removeStop.containerCount * removeStop.containerVolume);
-                        oplossing.tijd += timeDiff;
+                        foreach (var v in stopsToRemove)
+                        {
+                            CollectionStop sstop = v.Item1;
+
+                            sstop.dayStop.dayTime += v.Item2;
+                            sstop.ofloadStop.volume -= (sstop.containerCount * sstop.containerVolume);
+                            oplossing.tijd += v.Item2;
+                            oplossing.Remove(sstop);
+                            oplossing.RemoveStop(sstop, v.Item3);
+
+                        }
+
                         oplossing.penalty += penaltyDiff;
-                        oplossing.Remove(removeStop);
-                        oplossing.RemoveStop((int)indexRemove);
+
+
                     }
                 }
 
@@ -140,20 +244,29 @@ namespace GroteOPTOpdracht
 
         }
 
-        private bool ConsiderRemove(CollectionStop removeNode, out float timeDiff, out float penaltyDiff)
+        private bool ConsiderRemove(CollectionStop removeNode, out float penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove)
         {
             // calculate difference in duration
-            timeDiff = -(removeNode.loadingTime + afstandenMatrix[removeNode.prev.matrixId, removeNode.matrixId, 1]
-                                                  + afstandenMatrix[removeNode.matrixId, removeNode.next.matrixId, 1]
-                                                  - afstandenMatrix[removeNode.prev.matrixId, removeNode.next.matrixId, 1]);
+            stopsToRemove = new (CollectionStop, float, List<CollectionStop>)[removeNode.frequency]; //stop, timeDiff, penaltyDiff
 
-            if (oplossing.CorrectPickup(removeNode)) // check if the penalty needs to be added or if the penalty is already given
+            penaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
+
+            float totalTimeDiff = 0;
+
+            int arrayCounter = 0;
+
+            foreach (CollectionStop s in removeNode.siblings.Concat(new[] { removeNode }))
             {
-                penaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
+                float timeDiff = -(s.loadingTime + afstandenMatrix[s.prev.matrixId, s.matrixId, 1]
+                                                  + afstandenMatrix[s.matrixId, s.next.matrixId, 1]
+                                                  - afstandenMatrix[s.prev.matrixId, s.next.matrixId, 1]);
+                stopsToRemove[arrayCounter] = ((s, timeDiff, oplossing.MappingToList(s.dayStop.day, s.dayStop.truckId)));
+                arrayCounter++;
+                totalTimeDiff += timeDiff;
             }
-            else penaltyDiff = 0;
 
-            float scoreDiff = timeDiff + penaltyDiff;
+
+            float scoreDiff = totalTimeDiff + penaltyDiff;
 
             if (scoreDiff <= 0) // if the change is an improvement follow through
             {
@@ -169,30 +282,155 @@ namespace GroteOPTOpdracht
         }
 
 
-        private bool ConsiderAdd(CollectionStop insertNode, CollectionStop newStop, out float timeDiff, out float penaltyDiff)
+        private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff)
         {
-            timeDiff = 0;
-            penaltyDiff = 0;
-            // check if adding this node would exceed the cargoSpace 
-            if ((insertNode.ofloadStop.volume + newStop.containerCount * newStop.containerVolume) > oplossing.cargoSpace)
+            stopsToAdd = new (CollectionStop, CollectionStop, float, List<CollectionStop>)[newStop.frequency];
+            int arrayCounter = 0;
+            float totalTimeDiff = 0;
+
+            penaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
+
+
+
+            int rndInt;
+
+            if (newStop.frequency == 1)
             {
-                return false;
+                rndInt = rnd.Next(5);
+                string day = days[rndInt];
+                int stopTruck = rnd.Next(2);
+                List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
+                int? insertIndex = oplossing.pickRandomStop(ls);
+                if (insertIndex == null)
+                {
+                    return false;
+                }
+
+                CollectionStop insertLocStop = ls[(int)insertIndex];
+
+                stopsToAdd[arrayCounter] = (newStop, insertLocStop, 0f, ls);
+                arrayCounter++;
+
+            }
+            else if (newStop.frequency == 2)
+            {
+                rndInt = rnd.Next(2);
+                string day1 = days[rndInt];
+                int stopTruck1 = rnd.Next(2);
+                List<CollectionStop> ls1 = oplossing.MappingToList(day1, stopTruck1);
+                int? insertIndex1 = oplossing.pickRandomStop(ls1);
+                if (insertIndex1 == null)
+                {
+                    return false;
+                }
+
+                CollectionStop insertLocStop1 = ls1[(int)insertIndex1];
+
+                stopsToAdd[arrayCounter] = (newStop, insertLocStop1, 0f, ls1);
+                arrayCounter++;
+
+
+                CollectionStop sibling = newStop.siblings[0];
+                string day2 = days[rndInt + 3];
+                int stopTruck2 = rnd.Next(2);
+                List<CollectionStop> ls2 = oplossing.MappingToList(day2, stopTruck2);
+                int? insertIndex2 = oplossing.pickRandomStop(ls2);
+                if (insertIndex2 == null)
+                {
+                    return false;
+                }
+
+                CollectionStop insertLocStop2 = ls2[(int)insertIndex2];
+
+                stopsToAdd[arrayCounter] = (sibling, insertLocStop2, 0f, ls2);
+                arrayCounter++;
+
+
+
+            }
+            else if (newStop.frequency == 3)
+            {
+                int c = 0;
+                foreach (CollectionStop cStop in newStop.siblings.Concat(new[] { newStop }))
+                {
+
+                    string day = days[c];
+                    int stopTruck = rnd.Next(2);
+                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
+                    int? insertIndex = oplossing.pickRandomStop(ls);
+                    if (insertIndex == null)
+                    {
+                        return false;
+                    }
+
+                    CollectionStop insertLocStop = ls[(int)insertIndex];
+
+                    stopsToAdd[arrayCounter] = (cStop, insertLocStop, 0f, ls);
+                    arrayCounter++;
+
+
+                    c += 2;
+                }
+            }
+            else if (newStop.frequency == 4)
+            {
+                rndInt = rnd.Next(5);
+                int c = 0;
+
+                for (int i = 0; i < 5; i++)
+                {
+                    if (rndInt == i) continue;
+                    CollectionStop cStop = (c < 3) ? newStop.siblings[c] : newStop;
+
+                    string day = days[i];
+                    int stopTruck = rnd.Next(2);
+                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
+                    int? insertIndex = oplossing.pickRandomStop(ls);
+                    if (insertIndex == null)
+                    {
+                        return false;
+                    }
+
+                    CollectionStop insertLocStop = ls[(int)insertIndex];
+
+                    stopsToAdd[arrayCounter] = (cStop, insertLocStop, 0f, ls);
+                    arrayCounter++;
+
+
+                    c++;
+                }
             }
 
-            timeDiff = newStop.loadingTime + afstandenMatrix[insertNode.matrixId, newStop.matrixId, 1]
-                                           + afstandenMatrix[newStop.matrixId, insertNode.next.matrixId, 1]
-                                           - afstandenMatrix[insertNode.matrixId, insertNode.next.matrixId, 1];
-            if ( timeDiff + insertNode.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+            for (int i = 0; i < stopsToAdd.Length; i++)
             {
-                return false;
+                var v = stopsToAdd[i];
+                CollectionStop nStop = v.Item1;
+                CollectionStop iStop = v.Item2;
+                
+                // check if adding this node would exceed the cargoSpace 
+                if ((iStop.ofloadStop.volume + nStop.containerCount * nStop.containerVolume) > oplossing.cargoSpace)
+                {
+                    return false;
+                }
+
+
+                float timeDiff = nStop.loadingTime + afstandenMatrix[iStop.matrixId, nStop.matrixId, 1]
+                                + afstandenMatrix[nStop.matrixId, iStop.next.matrixId, 1]
+                                - afstandenMatrix[iStop.matrixId, iStop.next.matrixId, 1];
+                totalTimeDiff += timeDiff;
+                
+
+                if (timeDiff + iStop.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
+
+                stopsToAdd[i] = (nStop, iStop, timeDiff, v.Item4);
             }
 
-            if (oplossing.CorrectPickup(newStop, insertNode.dayStop.day, true)) //check if adding it satisfies the order and the penalty can be removed
-            {
-                penaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
-            }
 
-            float scoreDiff = penaltyDiff + timeDiff;
+
+            float scoreDiff = penaltyDiff + totalTimeDiff;
 
             if (scoreDiff <= 0) return true; // if the add is an improvement in score
             else if (RollChance(scoreDiff)) // else roll chance
@@ -204,9 +442,8 @@ namespace GroteOPTOpdracht
         }
 
 
-        private bool ConsiderSwap(CollectionStop s1, CollectionStop s2, out float s1Diff, out float s2Diff, out float timeDiff, out float penaltyDiff, out int loadDiff1, out int loadDiff2)
+        private bool ConsiderSwap(CollectionStop s1, CollectionStop s2, out float s1Diff, out float s2Diff, out float timeDiff, out int loadDiff1, out int loadDiff2)
         {
-            penaltyDiff = 0;
             s1Diff = 0;
             s2Diff = 0;
             timeDiff = 0;
@@ -266,25 +503,8 @@ namespace GroteOPTOpdracht
             if (s1.dayStop.dayTime + s1Diff > oplossing.maxDayTime ||
                 s2.dayStop.dayTime + s2Diff > oplossing.maxDayTime) return false;
 
-            //calculate diff by penalties
-            float penaltyDiff1 = 0;
-            float penaltyDiff2 = 0;
 
-            if (!(s1.orderId == s2.orderId)) //check before and after whether the penalty is there or not and update penaltyDiff accordingly
-            {
-                bool b1 = oplossing.CorrectPickup(s1);
-                bool b2 = oplossing.CorrectPickup(s2);
-
-                bool nieuwB1 = oplossing.CorrectPickup(s1, s2.dayStop.day);
-                bool nieuwB2 = oplossing.CorrectPickup(s2, s1.dayStop.day);
-
-                if (b1 && !nieuwB1) penaltyDiff1 = s1.loadingTime * s1.frequency * 3;
-                else if (!b1 && nieuwB1) penaltyDiff1 = -(s1.loadingTime * s1.frequency * 3);
-                if (b2 && !nieuwB2) penaltyDiff2 = s2.loadingTime * s2.frequency * 3;
-                else if (!b2 && nieuwB2) penaltyDiff2 = -(s2.loadingTime * s2.frequency * 3);
-            }
-            penaltyDiff = penaltyDiff1 + penaltyDiff2;
-            float scoreDiff = penaltyDiff + timeDiff;
+            float scoreDiff = timeDiff;
 
             if (scoreDiff <= 0) return true; //accept if better and roll chance if not
             else if (RollChance(scoreDiff))
@@ -308,6 +528,25 @@ namespace GroteOPTOpdracht
         public void OutputSolution()
         {
             oplossing.OutputSolution();
+        }
+
+        public int MapDayToInt(string day)
+        {
+            switch (day) {
+                case "monday":
+                    return 0;
+                case "tuesday":
+                    return 1;
+                case "wednesday":
+                    return 2;
+                case "thursday":
+                    return 3;
+                case "friday":
+                    return 4;
+            }
+            Console.WriteLine("dikke error");
+            return -1; //shouldnt happen
+
         }
     }
 }
