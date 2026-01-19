@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -92,7 +93,7 @@ namespace GroteOPTOpdracht
 
 
 
-                int action = rnd.Next(3);
+                int action = rnd.Next(4);
                 int rndInt;
                 if (action == 0) // swap
                 {
@@ -238,10 +239,222 @@ namespace GroteOPTOpdracht
                     }
                 }
 
-                z++;
+                else if (action == 3) // shift
+                {
+                    rndInt = rnd.Next(5);
+                    string day = days[rndInt];
+                    int truck = rnd.Next(2);
+                    List<CollectionStop> shiftFromList = oplossing.MappingToList(day, truck);
+                    int? index = oplossing.pickRandomStop(shiftFromList);
+                    if (index == null) continue;
+                    CollectionStop shiftStop = shiftFromList[(int)index];
+                    CollectionStop stopShiftAfter;
+
+                    int place = rnd.Next(3);
+                    if (place == 0) // Shift within one trip
+                    {
+                        // Initialize stop we want to shift to
+                        int? indexStopShiftAfter = oplossing.pickRandomStop(shiftFromList);
+                        if (indexStopShiftAfter == shiftFromList.Count-1 || indexStopShiftAfter == index) continue;
+                        stopShiftAfter = shiftFromList[(int)indexStopShiftAfter];
+
+                        // Calculate time difference
+                        int differenceTimeRemoveShiftStop = afstandenMatrix[shiftStop.prev.matrixId, shiftStop.next.matrixId, 1]
+                            - afstandenMatrix[shiftStop.prev.matrixId, shiftStop.matrixId, 1] - afstandenMatrix[shiftStop.matrixId, shiftStop.next.matrixId, 1];
+                        int differenceTimeAddShiftStop = afstandenMatrix[stopShiftAfter.matrixId, shiftStop.matrixId, 1]
+                            + afstandenMatrix[shiftStop.matrixId, stopShiftAfter.next.matrixId, 1]
+                            - afstandenMatrix[stopShiftAfter.matrixId, stopShiftAfter.next.matrixId, 1];
+                        int timeDiff = differenceTimeRemoveShiftStop + differenceTimeAddShiftStop;
+
+                        // Check if time difference is non-positive or roll chance returns true and follow through
+                        if (timeDiff <= 0 || (RollChance(timeDiff)) && shiftStop.dayStop.dayTime+timeDiff <= oplossing.maxDayTime)
+                        {
+                            shiftStop.prev.next = shiftStop.next;
+                            shiftStop.next.prev = shiftStop.prev;
+                            shiftStop.prev = stopShiftAfter;
+                            shiftStop.next = stopShiftAfter.next;
+                            // recalculate daytime
+                        }
+
+                        // else don't follow through
+                    }
+                    else if (place == 1) // Shift within one day
+                    {
+                        // Initialize stop we want to shift to
+                        int shiftToTruck = rnd.Next(2);
+                        List<CollectionStop> shiftToList = oplossing.MappingToList(day, shiftToTruck);
+                        int? indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
+                        if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue; // It will probably never be null because the dayStop is always in there
+                        stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
+
+                        (bool, float, float, float) consideredShift = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
+                        if (consideredShift.Item1)
+                            ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift.Item2, consideredShift.Item3, consideredShift.Item4);
+                        break;
+                    }
+                    else if (place == 2) // Shift to anywhere
+                    {
+                        // Initialize stop we want to shift to
+                        int shiftToTruck;
+                        string shiftToDay;
+                        List<CollectionStop> shiftToList;
+                        int? indexStopShiftAfter;
+
+                        switch (shiftStop.frequency)
+                        {
+                            case 1:
+                                // Initialize stop we want to shift to
+                                shiftToTruck = rnd.Next(2);
+                                shiftToDay = days[rnd.Next(5)];
+                                shiftToList = oplossing.MappingToList(shiftToDay, shiftToTruck);
+                                indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
+                                if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue;
+                                stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
+
+                                (bool, float, float, float) consideredShift1 = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
+                                if (consideredShift1.Item1)
+                                    ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift1.Item2, consideredShift1.Item3, consideredShift1.Item4);
+                                break;
+                            case 2: 
+                                if (shiftStop.dayStop.day == "monday" || shiftStop.dayStop.day == "thursday")
+                                {
+                                    (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2(["tuesday", "friday"], shiftStop);
+                                }
+                                else if (shiftStop.dayStop.day == "tuesday" || shiftStop.dayStop.day == "friday")
+                                {
+                                    (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2(["monday", "thursday"], shiftStop);
+                                    if (stopShiftAfters == (null, null, null, null, null, null)) break;
+                                    (bool, float, float, float) consideredShift21 = considerShift(stopShiftAfters.Item6[0].index, stopShiftAfters.Item6[0], stopShiftAfters.Item5[0], oplossing.MappingToList(stopShiftAfters.Item6[0].dayStop.day, stopShiftAfters.Item6[0].dayStop.truckId), stopShiftAfters.Item3[0]);
+                                    (bool, float, float, float) consideredShift22 = considerShift(stopShiftAfters.Item6[1].index, stopShiftAfters.Item6[1], stopShiftAfters.Item5[1], oplossing.MappingToList(stopShiftAfters.Item6[1].dayStop.day, stopShiftAfters.Item6[1].dayStop.truckId), stopShiftAfters.Item3[1]);
+                                    if (consideredShift21.Item1 && consideredShift22.Item1) // if the shifting of both stops is okay then we implement the actual shift
+                                    {
+                                        ActualShift(stopShiftAfters.Item6[0].index, stopShiftAfters.Item6[0], stopShiftAfters.Item5[0], oplossing.MappingToList(stopShiftAfters.Item6[0].dayStop.day, stopShiftAfters.Item6[0].dayStop.truckId), stopShiftAfters.Item3[0], consideredShift21.Item2, consideredShift21.Item3, consideredShift21.Item4);
+                                        ActualShift(stopShiftAfters.Item6[1].index, stopShiftAfters.Item6[1], stopShiftAfters.Item5[1], oplossing.MappingToList(stopShiftAfters.Item6[1].dayStop.day, stopShiftAfters.Item6[1].dayStop.truckId), stopShiftAfters.Item3[1], consideredShift22.Item2, consideredShift22.Item3, consideredShift22.Item4);
+                                    }
+                                    break;
+                                }
+                                break;
+                            case 3: break;
+                            case 4: // We have to force the stop to shift to the 'missing' day
+                                // Initialize stop to one in unused day
+                                shiftToTruck = rnd.Next(2);
+                                string unusedDay = "";
+                                List<string> siblingDays = new List<string>();
+                                foreach (CollectionStop sibling in shiftStop.siblings)
+                                {
+                                    siblingDays.Add(sibling.dayStop.day);
+                                }
+                                foreach (string weekday in days) // Find day on which no sibling stop is
+                                {
+                                    if (!siblingDays.Contains(day) && day != shiftStop.dayStop.day)
+                                        unusedDay = weekday;
+                                }
+
+                                shiftToDay = unusedDay;
+                                shiftToList = oplossing.MappingToList(shiftToDay, shiftToTruck);
+                                indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
+                                if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue;
+                                stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
+
+                                (bool, float, float, float) consideredShift4 = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
+                                if (consideredShift4.Item1)
+                                    ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift4.Item2, consideredShift4.Item3, consideredShift4.Item4);
+                                break;
+                        }
+                    }
+                }
+
+                    z++;
             }
 
 
+        }
+
+        private (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) InitializeFreq2(List<string> dayShiftToOptions, CollectionStop shiftStopOriginal)
+        {
+            int shiftToTruck1;
+            int shiftToTruck2;
+            string shiftToDay1;
+            string shiftToDay2;
+            List<CollectionStop> shiftToList1;
+            List<CollectionStop> shiftToList2;
+            int? indexStopShiftAfter1;
+            int? indexStopShiftAfter2;
+            CollectionStop stopShiftAfter1;
+            CollectionStop stopShiftAfter2;
+            CollectionStop shiftStop1 = shiftStopOriginal;
+            CollectionStop shiftStop2 = shiftStopOriginal.siblings[0];
+
+            shiftToTruck1 = rnd.Next(2);
+            shiftToTruck2 = rnd.Next(2);
+            int firstDayIndex = rnd.Next(2);
+            shiftToDay1 = dayShiftToOptions[firstDayIndex];
+            if (firstDayIndex + 1 == 1)
+                shiftToDay2 = dayShiftToOptions[1];
+            else
+                shiftToDay2 = dayShiftToOptions[0];
+            shiftToList1 = oplossing.MappingToList(shiftToDay1, shiftToTruck1);
+            shiftToList2 = oplossing.MappingToList(shiftToDay2, shiftToTruck2);
+            indexStopShiftAfter1 = oplossing.pickRandomStop(shiftToList1);
+            indexStopShiftAfter2 = oplossing.pickRandomStop(shiftToList2);
+            if (indexStopShiftAfter1 == shiftToList1.Count - 1 || indexStopShiftAfter1 == null) return (null, null, null, null, null, null);
+            if (indexStopShiftAfter2 == shiftToList2.Count - 1 || indexStopShiftAfter2 == null) return (null, null, null, null, null, null);
+            stopShiftAfter1 = shiftToList1[(int)indexStopShiftAfter1];
+            stopShiftAfter2 = shiftToList2[(int)indexStopShiftAfter2];
+
+            int[] shiftToTruck = { shiftToTruck1, shiftToTruck2 };
+            string[] shiftToDay = { shiftToDay1, shiftToDay2 };
+            List<CollectionStop>[] shiftToList = { shiftToList1, shiftToList2 };
+            int?[] indexStopShiftAfter = { indexStopShiftAfter1, indexStopShiftAfter2 };
+            CollectionStop[] stopShiftAfter = { stopShiftAfter1, stopShiftAfter2 };
+            CollectionStop[] shiftStop = { shiftStop1, shiftStop2 };
+            return (shiftToTruck, shiftToDay, shiftToList, indexStopShiftAfter, stopShiftAfter, shiftStop);
+        }
+
+        private (bool, float, float, float) considerShift(int indexShiftStop, CollectionStop shiftStop, CollectionStop stopShiftAfter, List<CollectionStop> shiftFromList, List<CollectionStop> shiftToList)
+        {
+            // Check if cargo doesn't get too heavy with shift
+            if (stopShiftAfter.ofloadStop.volume + shiftStop.containerVolume * shiftStop.containerCount > oplossing.cargoSpace) return (false, 0, 0, 0);
+
+            // Calculate time difference
+            float differenceTimeRemoveShiftStop = afstandenMatrix[shiftStop.prev.matrixId, shiftStop.next.matrixId, 1]
+                - afstandenMatrix[shiftStop.prev.matrixId, shiftStop.matrixId, 1] - afstandenMatrix[shiftStop.matrixId, shiftStop.next.matrixId, 1]
+                - shiftStop.loadingTime;
+            float differenceTimeAddShiftStop = afstandenMatrix[stopShiftAfter.matrixId, shiftStop.matrixId, 1]
+                + afstandenMatrix[shiftStop.matrixId, stopShiftAfter.next.matrixId, 1]
+                - afstandenMatrix[stopShiftAfter.matrixId, stopShiftAfter.next.matrixId, 1]
+                + shiftStop.loadingTime;
+            float timeDiff = differenceTimeRemoveShiftStop + differenceTimeAddShiftStop;
+
+            // Check if time difference is non-positive or (roll chance returns true and max daytime is not exceeded) and follow through
+            if (timeDiff <= 0 || (RollChance(timeDiff)) && stopShiftAfter.dayStop.dayTime + differenceTimeAddShiftStop <= oplossing.maxDayTime)
+                return (true, differenceTimeRemoveShiftStop, differenceTimeAddShiftStop, timeDiff);
+
+            // else don't follow through
+            return (false, differenceTimeRemoveShiftStop, differenceTimeAddShiftStop, timeDiff);
+        }
+
+        private void ActualShift(int indexShiftStop, CollectionStop shiftStop, CollectionStop stopShiftAfter, List<CollectionStop> shiftFromList, List<CollectionStop> shiftToList, float differenceTimeRemoveShiftStop, float differenceTimeAddShiftStop, float timeDiff)
+        {
+            shiftStop.prev.next = shiftStop.next;
+            shiftStop.next.prev = shiftStop.prev;
+            shiftStop.prev = stopShiftAfter;
+            shiftStop.next = stopShiftAfter.next;
+
+            shiftStop.dayStop.dayTime += differenceTimeRemoveShiftStop;
+            shiftStop.ofloadStop.volume -= shiftStop.containerVolume * shiftStop.containerCount;
+
+            shiftStop.dayStop = stopShiftAfter.dayStop;
+            shiftStop.ofloadStop = stopShiftAfter.ofloadStop;
+
+            shiftStop.dayStop.dayTime += differenceTimeAddShiftStop;
+            shiftStop.ofloadStop.volume += shiftStop.containerVolume * shiftStop.containerCount;
+
+            oplossing.tijd += timeDiff;
+
+            shiftFromList[indexShiftStop] = shiftFromList[shiftFromList.Count - 1];
+            shiftFromList.RemoveAt(shiftFromList.Count - 1);
+            shiftToList.Add(shiftStop);
         }
 
         private bool ConsiderRemove(CollectionStop removeNode, out float penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove)
