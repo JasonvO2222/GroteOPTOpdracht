@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
+using System.Numerics;
+using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using System.Runtime.Intrinsics.X86;
 using System.Security.Cryptography;
@@ -335,8 +337,6 @@ namespace GroteOPTOpdracht
         {
             if (l1 == l2)
             {
-                (l1[stop1.index], l1[stop2.index]) = (l1[stop2.index], l1[stop1.index]);
-                (stop1.index, stop2.index) = (stop2.index, stop1.index);
                 return;
             }
 
@@ -365,6 +365,30 @@ namespace GroteOPTOpdracht
             l1.Add(stop2);
             l2.Add(stop1);
 
+        }
+
+
+        public void ShiftStop(CollectionStop source, List<CollectionStop> sourceList, List<CollectionStop> targetList)
+        {
+            if (sourceList == targetList)
+            {
+                return;
+            }
+
+            int sourceIndex = source.index;
+            int lastIndex = sourceList.Count - 1;
+            int newIndex = targetList.Count;
+            source.index = newIndex;
+
+            if (sourceIndex != lastIndex)
+            {
+                CollectionStop lastStop = sourceList[lastIndex];
+                lastStop.index = sourceIndex;
+                (sourceList[sourceIndex], sourceList[lastIndex]) = (sourceList[lastIndex], sourceList[sourceIndex]);
+            }
+
+            sourceList.RemoveAt(lastIndex);
+            targetList.Add(source);
         }
 
         public void OutputSolution(string path = "Resultaat.txt")
@@ -491,6 +515,20 @@ namespace GroteOPTOpdracht
             stop.ofloadStop = null;
             stop.dayStop = null;
             stop.included = false;
+        }
+
+        // shift two nodes in the linkedList
+        public void Shift(CollectionStop source,  CollectionStop target)
+        {
+            source.prev.next = source.next;
+            source.next.prev = source.prev;
+            source.prev = target;
+            source.next = target.next;
+            target.next.prev = source;
+            target.next = source;
+
+            source.dayStop = target.dayStop;
+            source.ofloadStop = target.ofloadStop;
         }
 
 

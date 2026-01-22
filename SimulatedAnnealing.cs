@@ -24,7 +24,7 @@ namespace GroteOPTOpdracht
 
         public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations, int iterationsTConstant)
         {
-            if (totalIterations <= iterationsTConstant) { 
+            if (totalIterations <= iterationsTConstant) {
                 Console.WriteLine("totalIterations cannot be less than (or equal to) iterationsTConstant");
                 return;
             }
@@ -34,23 +34,41 @@ namespace GroteOPTOpdracht
             T_min = chanceVarMin;
             a = chanceFactor;
             zLim = totalIterations;
-            Q = (int)((totalIterations-iterationsTConstant)/(Math.Log(T_min / T, a)));
+            Q = (int)((totalIterations - iterationsTConstant) / (Math.Log(T_min / T, a)));
             Console.WriteLine(Q);
 
 
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
 
-            return;
-
-
-
             // Simulated Annealing
-            // Either add/remove/swap action
+            // Either add/remove/swap/shift action
             // Need one index for remove and 2 for swap
 
             long z = 1;
             bool TFlag = true;
+            int action;
+
+            CollectionStop source;
+            List<CollectionStop> sourceList;
+            int? sourceIndex;
+            int sourceDay;
+            int sourceTruck;
+            float sourceTimeDiff;
+            int sourceVolumeDiff;
+            CollectionStop target;
+            List<CollectionStop> targetList;
+            int? targetIndex;
+            int targetDay;
+            float targetTimeDiff;
+            int targetVolumeDiff;
+
+            float timeDiff;
+            float penaltyDiff;
+
+            int shiftMode;
+            int freq;
+
             while (z <= zLim)
             {
 
@@ -67,365 +85,317 @@ namespace GroteOPTOpdracht
 
 
 
-                int action = rnd.Next(4);
-                int rndInt;
+                action = rnd.Next(4);
                 if (action == 0) // swap
                 {
-                    //continue;
+                    Console.WriteLine("Swap");
+                    sourceDay = rnd.Next(5);
 
-                    int day1 = rnd.Next(5);
-                    int stop1Truck = rnd.Next(2);
-                    List<CollectionStop> list1 = oplossing.MappingToList(day1, stop1Truck);
-                    int? index1 = oplossing.pickRandomStop(list1);
-                    if (index1 == null) { continue; }
-                    CollectionStop stop1 = list1[(int)index1];
-
-                    int day2 = -1;
-                    int stop2Truck = rnd.Next(2);
+                    sourceList = oplossing.MappingToList(sourceDay, rnd.Next(2));
+                    sourceIndex = oplossing.pickRandomStop(sourceList);
+                    if (sourceIndex == null) { continue; }
+                    source = sourceList[(int)sourceIndex];
 
 
-                    if (stop1.frequency == 3)
+                    if (source.frequency == 4) // stop can switch to skipped day
                     {
-                        day2 = day1;
-                    }
-                    else if (stop1.frequency == 4)
-                    {
-                        int dayTotal = 10;
-                        foreach (CollectionStop c in stop1.siblings.Concat(new[] { stop1 }))
+                        if (rnd.Next(2) == 1)
                         {
-                            dayTotal -= c.dayStop.day;
+                            targetDay = sourceDay;
                         }
-                        day2 = (rnd.Next(2) == 1) ? day1 : dayTotal;
+                        else
+                        {
+                            targetDay = 10;
+                            foreach (CollectionStop c in source.siblings.Append(source))
+                            {
+                                targetDay -= c.dayStop.day;
+                            }
+                        }
+
                     }
-                    else if (stop1.frequency == 2)
+                    else if (source.frequency == 2 || source.frequency == 3) // stop must stay on same day
                     {
-                        //swapping both stops to a different day combination yet to be implemented (if at all)
-
-                        day2 = day1;
+                        targetDay = sourceDay;
+                    }
+                    else
+                    {
+                        targetDay = rnd.Next(5);
                     }
 
 
-                    List<CollectionStop> list2 = oplossing.MappingToList(day2, stop2Truck);
-                    int? index2 = oplossing.pickRandomStop(list2);
+                    targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                    targetIndex = oplossing.pickRandomStop(targetList);
 
-                    if (index1 == null || index2 == null || (index1 == index2 && list1 != list2))
+                    if (targetIndex == null || (sourceIndex == targetIndex && targetList == sourceList))
                     {
                         continue;
                     }
-                    CollectionStop stop2 = list2[(int)index2];
-                    if (day1 != day2 && stop2.frequency > 1)
+
+                    target = targetList[(int)targetIndex];
+
+                    if (targetDay != sourceDay && target.frequency > 1)
                     {
                         continue;
                     }
 
 
 
-                    if (ConsiderSwap(stop1, stop2, out float s1Diff, out float s2Diff, out float timeDiff, out int loadDiff1, out int loadDiff2))
+                    if (ConsiderSwap(source, target, out sourceTimeDiff, out targetTimeDiff, out timeDiff, out sourceVolumeDiff, out targetVolumeDiff))
                     {
-                        stop1.dayStop.dayTime += s1Diff;
-                        stop2.dayStop.dayTime += s2Diff;
-                        stop1.ofloadStop.volume += loadDiff1;
-                        stop2.ofloadStop.volume += loadDiff2;
+                        source.dayStop.dayTime += sourceTimeDiff;
+                        target.dayStop.dayTime += targetTimeDiff;
+                        source.ofloadStop.volume += sourceVolumeDiff;
+                        target.ofloadStop.volume += targetVolumeDiff;
 
                         oplossing.tijd += timeDiff;
-                        oplossing.Swap(stop1, stop2);
-                        oplossing.SwapStop(stop1, list1, stop2, list2);
+                        oplossing.Swap(source, target);
+                        oplossing.SwapStop(source, sourceList, target, targetList);
                     }
 
                 }
 
                 else if (action == 1) // add
                 {
-                    //continue;
-                    
                     Console.WriteLine("add");
-                    int? indexIgnore = oplossing.pickRandomIgnoredStop();
 
-                    if (indexIgnore == null) 
+                    sourceIndex = oplossing.pickRandomIgnoredStop();
+                    sourceList = oplossing.ignore;
+
+                    if (sourceIndex == null)
                     {
                         continue;
                     }
 
-                    CollectionStop newStop = oplossing.ignore[(int)indexIgnore];
+                    source = sourceList[(int)sourceIndex];
 
-                                                            //stop to add, stop where isnert, timeDiff, list where to add
-                    if (ConsiderAdd(newStop, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff))
+                    //stop to add, stop where isnert, timeDiff, list where to add
+                    if (ConsiderAdd(source, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out penaltyDiff))
                     {
                         foreach (var v in stopsToAdd)
                         {
-                            CollectionStop stop = v.Item1;
-                            CollectionStop insertLocNode = v.Item2;
-                            float timeDiff = v.Item3;
-                            insertLocNode.dayStop.dayTime += timeDiff;
-                            insertLocNode.ofloadStop.volume += (stop.containerVolume * stop.containerCount);
+                            (source, target, timeDiff, targetList) = v;
+                            target.dayStop.dayTime += timeDiff;
+                            target.ofloadStop.volume += (source.containerVolume * source.containerCount);
                             oplossing.tijd += timeDiff;
-                            oplossing.Insert(insertLocNode, stop);
-                            oplossing.AddStop(stop, v.Item4);
-
-                            Console.WriteLine("add 1");
+                            oplossing.Insert(target, source);
+                            oplossing.AddStop(source, targetList);
                         }
                         oplossing.penalty += penaltyDiff;
                     }
-                    else
-                    {
-                        Console.WriteLine("fail");
-                    }
-
 
                 }
 
                 else if (action == 2) // remove
                 {
+                    Console.WriteLine("Remove");
 
-                    //continue;
+                    sourceList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
+                    sourceIndex = oplossing.pickRandomStop(sourceList);
 
-                    int day = rnd.Next(5);
-                    int stopTruck = rnd.Next(2);
-                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
-                    int? indexRemove = oplossing.pickRandomStop(ls);
-
-                    if (indexRemove == null)
+                    if (sourceIndex == null)
                     {
                         continue;
                     }
 
-                    CollectionStop removeStop = ls[(int)indexRemove];
+                    source = sourceList[(int)sourceIndex];
 
-                    if (ConsiderRemove(removeStop, out float penaltyDiff, out (CollectionStop, float, List <CollectionStop>)[] stopsToRemove))
+                    if (ConsiderRemove(source, out penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove))
                     {
                         foreach (var v in stopsToRemove)
                         {
-                            CollectionStop sstop = v.Item1;
+                            (source, timeDiff, sourceList) = v;
 
-                            sstop.dayStop.dayTime += v.Item2;
-                            sstop.ofloadStop.volume -= (sstop.containerCount * sstop.containerVolume);
-                            oplossing.tijd += v.Item2;
-                            oplossing.Remove(sstop);
-                            oplossing.RemoveStop(sstop, v.Item3);
+                            source.dayStop.dayTime += timeDiff;
+                            source.ofloadStop.volume -= (source.containerCount * source.containerVolume);
+                            oplossing.tijd += timeDiff;
+                            oplossing.Remove(source);
+                            oplossing.RemoveStop(source, sourceList);
 
                         }
-
                         oplossing.penalty += penaltyDiff;
-
-
                     }
                 }
 
                 else if (action == 3) // shift
                 {
-                    int day = rnd.Next(5);
-                    int truck = rnd.Next(2);
-                    List<CollectionStop> shiftFromList = oplossing.MappingToList(day, truck);
-                    int? index = oplossing.pickRandomStop(shiftFromList);
-                    if (index == null) continue;
-                    CollectionStop shiftStop = shiftFromList[(int)index];
-                    CollectionStop stopShiftAfter;
-
-                    int place = rnd.Next(3);
-                    if (place == 0) // Shift within one trip
+                    shiftMode = rnd.Next(3); // 0 means within ride, 1 means within day, 2 means within week
+                    sourceDay = rnd.Next(5);
+                    sourceTruck = rnd.Next(2);
+                    sourceList = oplossing.MappingToList(sourceDay, sourceTruck);
+                    sourceIndex = oplossing.pickRandomStop(sourceList);
+                    if (sourceIndex == null)
                     {
-                        // Initialize stop we want to shift to
-                        int? indexStopShiftAfter = oplossing.pickRandomStop(shiftFromList);
-                        if (indexStopShiftAfter == shiftFromList.Count-1 || indexStopShiftAfter == index) continue;
-                        stopShiftAfter = shiftFromList[(int)indexStopShiftAfter];
-
-                        // Calculate time difference
-                        int differenceTimeRemoveShiftStop = afstandenMatrix[shiftStop.prev.matrixId, shiftStop.next.matrixId, 1]
-                            - afstandenMatrix[shiftStop.prev.matrixId, shiftStop.matrixId, 1] - afstandenMatrix[shiftStop.matrixId, shiftStop.next.matrixId, 1];
-                        int differenceTimeAddShiftStop = afstandenMatrix[stopShiftAfter.matrixId, shiftStop.matrixId, 1]
-                            + afstandenMatrix[shiftStop.matrixId, stopShiftAfter.next.matrixId, 1]
-                            - afstandenMatrix[stopShiftAfter.matrixId, stopShiftAfter.next.matrixId, 1];
-                        int timeDiff = differenceTimeRemoveShiftStop + differenceTimeAddShiftStop;
-
-                        // Check if time difference is non-positive or roll chance returns true and follow through
-                        if (timeDiff <= 0 || (RollChance(timeDiff)) && shiftStop.dayStop.dayTime+timeDiff <= oplossing.maxDayTime)
-                        {
-                            shiftStop.prev.next = shiftStop.next;
-                            shiftStop.next.prev = shiftStop.prev;
-                            shiftStop.prev = stopShiftAfter;
-                            shiftStop.next = stopShiftAfter.next;
-                            // recalculate daytime
-                        }
-
-                        // else don't follow through
+                        continue;
                     }
-                    else if (place == 1) // Shift within one day
-                    {
-                        // Initialize stop we want to shift to
-                        int shiftToTruck = rnd.Next(2);
-                        List<CollectionStop> shiftToList = oplossing.MappingToList(day, shiftToTruck);
-                        int? indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
-                        if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue; // It will probably never be null because the dayStop is always in there
-                        stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
 
-                        (bool, float, float, float) consideredShift = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
-                        if (consideredShift.Item1)
-                            ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift.Item2, consideredShift.Item3, consideredShift.Item4);
-                        break;
-                    }
-                    else if (place == 2) // Shift to anywhere
-                    {
-                        // Initialize stop we want to shift to
-                        int shiftToTruck;
-                        int shiftToDay;
-                        List<CollectionStop> shiftToList;
-                        int? indexStopShiftAfter;
+                    source = sourceList[(int)sourceIndex];
+                    freq = (shiftMode < 2) ? 1 : source.frequency;
 
-                        switch (shiftStop.frequency)
+
+
+                    if (ConsiderShift(source, sourceList, shiftMode, out (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[] stopsToShift))
+                    {
+                        for (int i = 0; i < freq; i++)
                         {
-                            case 1:
-                                // Initialize stop we want to shift to
-                                shiftToTruck = rnd.Next(2);
-                                shiftToDay = rnd.Next(5);
-                                shiftToList = oplossing.MappingToList(shiftToDay, shiftToTruck);
-                                indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
-                                if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue;
-                                stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
+                            (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff) = stopsToShift[i];
 
-                                (bool, float, float, float) consideredShift1 = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
-                                if (consideredShift1.Item1)
-                                    ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift1.Item2, consideredShift1.Item3, consideredShift1.Item4);
-                                break;
-                            case 2: 
-                                if (shiftStop.dayStop.day == 0 || shiftStop.dayStop.day == 3)
-                                {
-                                    (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2([1, 4], shiftStop);
-                                }
-                                else if (shiftStop.dayStop.day == 1 || shiftStop.dayStop.day == 4)
-                                {
-                                    (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2([0, 3], shiftStop);
-                                    if (stopShiftAfters == (null, null, null, null, null, null)) break;
-                                    (bool, float, float, float) consideredShift21 = considerShift(stopShiftAfters.Item6[0].index, stopShiftAfters.Item6[0], stopShiftAfters.Item5[0], oplossing.MappingToList(stopShiftAfters.Item6[0].dayStop.day, stopShiftAfters.Item6[0].dayStop.truckId), stopShiftAfters.Item3[0]);
-                                    (bool, float, float, float) consideredShift22 = considerShift(stopShiftAfters.Item6[1].index, stopShiftAfters.Item6[1], stopShiftAfters.Item5[1], oplossing.MappingToList(stopShiftAfters.Item6[1].dayStop.day, stopShiftAfters.Item6[1].dayStop.truckId), stopShiftAfters.Item3[1]);
-                                    if (consideredShift21.Item1 && consideredShift22.Item1) // if the shifting of both stops is okay then we implement the actual shift
-                                    {
-                                        ActualShift(stopShiftAfters.Item6[0].index, stopShiftAfters.Item6[0], stopShiftAfters.Item5[0], oplossing.MappingToList(stopShiftAfters.Item6[0].dayStop.day, stopShiftAfters.Item6[0].dayStop.truckId), stopShiftAfters.Item3[0], consideredShift21.Item2, consideredShift21.Item3, consideredShift21.Item4);
-                                        ActualShift(stopShiftAfters.Item6[1].index, stopShiftAfters.Item6[1], stopShiftAfters.Item5[1], oplossing.MappingToList(stopShiftAfters.Item6[1].dayStop.day, stopShiftAfters.Item6[1].dayStop.truckId), stopShiftAfters.Item3[1], consideredShift22.Item2, consideredShift22.Item3, consideredShift22.Item4);
-                                    }
-                                    break;
-                                }
-                                break;
-                            case 3: break;
-                            case 4: // We have to force the stop to shift to the 'missing' day
-                                // Initialize stop to one in unused day
-                                shiftToTruck = rnd.Next(2);
-                                int unusedDay = -1;
-                                List<int> siblingDays = new List<int>();
-                                foreach (CollectionStop sibling in shiftStop.siblings)
-                                {
-                                    siblingDays.Add(sibling.dayStop.day);
-                                }
-                                for (int weekday = 0; weekday < 5; weekday++) // Find day on which no sibling stop is
-                                {
-                                    if (!siblingDays.Contains(day) && day != shiftStop.dayStop.day)
-                                        unusedDay = weekday;
-                                }
+                            source.dayStop.dayTime += sourceTimeDiff;
+                            target.dayStop.dayTime += targetTimeDiff;
+                            source.ofloadStop.volume -= (source.containerCount * source.containerVolume);
+                            source.ofloadStop.volume -= (source.containerCount * source.containerVolume);
 
-                                shiftToDay = unusedDay;
-                                shiftToList = oplossing.MappingToList(shiftToDay, shiftToTruck);
-                                indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
-                                if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue;
-                                stopShiftAfter = shiftToList[(int)indexStopShiftAfter];
+                            oplossing.tijd += sourceTimeDiff = targetTimeDiff;
+                            oplossing.Shift(source, target);
+                            oplossing.ShiftStop(source, sourceList, targetList);
 
-                                (bool, float, float, float) consideredShift4 = considerShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList);
-                                if (consideredShift4.Item1)
-                                    ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift4.Item2, consideredShift4.Item3, consideredShift4.Item4);
-                                break;
                         }
                     }
                 }
 
-                    z++;
+                z++;
             }
 
 
         }
 
-        private (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) InitializeFreq2(List<int> dayShiftToOptions, CollectionStop shiftStopOriginal)
+        private bool ConsiderShift(CollectionStop source, List<CollectionStop> sourceList, int shiftMode, out (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[] stopsToShift)
         {
-            int shiftToTruck1;
-            int shiftToTruck2;
-            int shiftToDay1;
-            int shiftToDay2;
-            List<CollectionStop> shiftToList1;
-            List<CollectionStop> shiftToList2;
-            int? indexStopShiftAfter1;
-            int? indexStopShiftAfter2;
-            CollectionStop stopShiftAfter1;
-            CollectionStop stopShiftAfter2;
-            CollectionStop shiftStop1 = shiftStopOriginal;
-            CollectionStop shiftStop2 = shiftStopOriginal.siblings[0];
+            CollectionStop target;
+            List<CollectionStop> targetList;
+            int? targetIndex;
+            int sourceDay;
+            int targetDay;
+            float timeDiff;
+            float sourceTimeDiff;
+            float targetTimeDiff;
 
-            shiftToTruck1 = rnd.Next(2);
-            shiftToTruck2 = rnd.Next(2);
-            int firstDayIndex = rnd.Next(2);
-            shiftToDay1 = dayShiftToOptions[firstDayIndex];
-            if (firstDayIndex + 1 == 1)
-                shiftToDay2 = dayShiftToOptions[1];
-            else
-                shiftToDay2 = dayShiftToOptions[0];
-            shiftToList1 = oplossing.MappingToList(shiftToDay1, shiftToTruck1);
-            shiftToList2 = oplossing.MappingToList(shiftToDay2, shiftToTruck2);
-            indexStopShiftAfter1 = oplossing.pickRandomStop(shiftToList1);
-            indexStopShiftAfter2 = oplossing.pickRandomStop(shiftToList2);
-            if (indexStopShiftAfter1 == shiftToList1.Count - 1 || indexStopShiftAfter1 == null) return (null, null, null, null, null, null);
-            if (indexStopShiftAfter2 == shiftToList2.Count - 1 || indexStopShiftAfter2 == null) return (null, null, null, null, null, null);
-            stopShiftAfter1 = shiftToList1[(int)indexStopShiftAfter1];
-            stopShiftAfter2 = shiftToList2[(int)indexStopShiftAfter2];
+            stopsToShift = new (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[source.frequency];
 
-            int[] shiftToTruck = { shiftToTruck1, shiftToTruck2 };
-            int[] shiftToDay = { shiftToDay1, shiftToDay2 };
-            List<CollectionStop>[] shiftToList = { shiftToList1, shiftToList2 };
-            int?[] indexStopShiftAfter = { indexStopShiftAfter1, indexStopShiftAfter2 };
-            CollectionStop[] stopShiftAfter = { stopShiftAfter1, stopShiftAfter2 };
-            CollectionStop[] shiftStop = { shiftStop1, shiftStop2 };
-            return (shiftToTruck, shiftToDay, shiftToList, indexStopShiftAfter, stopShiftAfter, shiftStop);
-        }
 
-        private (bool, float, float, float) considerShift(int indexShiftStop, CollectionStop shiftStop, CollectionStop stopShiftAfter, List<CollectionStop> shiftFromList, List<CollectionStop> shiftToList)
-        {
-            // Check if cargo doesn't get too heavy with shift
-            if (stopShiftAfter.ofloadStop.volume + shiftStop.containerVolume * shiftStop.containerCount > oplossing.cargoSpace) return (false, 0, 0, 0);
+            if (shiftMode < 2)
+            {
+                targetList = (shiftMode == 0) ? sourceList : oplossing.MappingToList(source.dayStop.day, rnd.Next(2));
+                targetList = sourceList;
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
+                {
+                    return false;
+                }
 
-            // Calculate time difference
-            float differenceTimeRemoveShiftStop = afstandenMatrix[shiftStop.prev.matrixId, shiftStop.next.matrixId, 1]
-                - afstandenMatrix[shiftStop.prev.matrixId, shiftStop.matrixId, 1] - afstandenMatrix[shiftStop.matrixId, shiftStop.next.matrixId, 1]
-                - shiftStop.loadingTime;
-            float differenceTimeAddShiftStop = afstandenMatrix[stopShiftAfter.matrixId, shiftStop.matrixId, 1]
-                + afstandenMatrix[shiftStop.matrixId, stopShiftAfter.next.matrixId, 1]
-                - afstandenMatrix[stopShiftAfter.matrixId, stopShiftAfter.next.matrixId, 1]
-                + shiftStop.loadingTime;
-            float timeDiff = differenceTimeRemoveShiftStop + differenceTimeAddShiftStop;
+                target = targetList[(int)targetIndex];
 
-            // Check if time difference is non-positive or (roll chance returns true and max daytime is not exceeded) and follow through
-            if (timeDiff <= 0 || (RollChance(timeDiff)) && stopShiftAfter.dayStop.dayTime + differenceTimeAddShiftStop <= oplossing.maxDayTime)
-                return (true, differenceTimeRemoveShiftStop, differenceTimeAddShiftStop, timeDiff);
+                sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
+                    - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
+                    - afstandenMatrix[source.matrixId, source.next.matrixId, 1]
+                    - source.loadingTime;
+                targetTimeDiff = afstandenMatrix[target.matrixId, source.matrixId, 1]
+                    + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                    - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
+                    + source.loadingTime;
+                timeDiff = sourceTimeDiff + targetTimeDiff;
 
-            // else don't follow through
-            return (false, differenceTimeRemoveShiftStop, differenceTimeAddShiftStop, timeDiff);
-        }
+                stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
+            }
+            else if (source.frequency == 1)
+            {
+                targetList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
+                {
+                    return false;
+                }
 
-        private void ActualShift(int indexShiftStop, CollectionStop shiftStop, CollectionStop stopShiftAfter, List<CollectionStop> shiftFromList, List<CollectionStop> shiftToList, float differenceTimeRemoveShiftStop, float differenceTimeAddShiftStop, float timeDiff)
-        {
-            shiftStop.prev.next = shiftStop.next;
-            shiftStop.next.prev = shiftStop.prev;
-            shiftStop.prev = stopShiftAfter;
-            shiftStop.next = stopShiftAfter.next;
+                target = targetList[(int)targetIndex];
 
-            shiftStop.dayStop.dayTime += differenceTimeRemoveShiftStop;
-            shiftStop.ofloadStop.volume -= shiftStop.containerVolume * shiftStop.containerCount;
+                sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
+                    - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
+                    - afstandenMatrix[source.matrixId, source.next.matrixId, 1]
+                    - source.loadingTime;
+                targetTimeDiff = afstandenMatrix[target.matrixId, source.matrixId, 1]
+                    + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                    - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
+                    + source.loadingTime;
+                timeDiff = sourceTimeDiff + targetTimeDiff;
 
-            shiftStop.dayStop = stopShiftAfter.dayStop;
-            shiftStop.ofloadStop = stopShiftAfter.ofloadStop;
+                stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
+            }
+            else if (source.frequency == 4)
+            {
+                targetDay = 10;
+                foreach (CollectionStop s in source.siblings.Append(source))
+                {
+                    targetDay -= s.dayStop.day;
+                }
+                targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
+                {
+                    return false;
+                }
 
-            shiftStop.dayStop.dayTime += differenceTimeAddShiftStop;
-            shiftStop.ofloadStop.volume += shiftStop.containerVolume * shiftStop.containerCount;
+                target = targetList[(int)targetIndex];
 
-            oplossing.tijd += timeDiff;
+                sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
+                    - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
+                    - afstandenMatrix[source.matrixId, source.next.matrixId, 1]
+                    - source.loadingTime;
+                targetTimeDiff = afstandenMatrix[target.matrixId, source.matrixId, 1]
+                    + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                    - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
+                    + source.loadingTime;
+                timeDiff = sourceTimeDiff + targetTimeDiff;
 
-            shiftFromList[indexShiftStop] = shiftFromList[shiftFromList.Count - 1];
-            shiftFromList.RemoveAt(shiftFromList.Count - 1);
-            shiftToList.Add(shiftStop);
+                stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
+            }
+            else if (source.frequency != 2)
+            {
+                sourceDay = source.dayStop.day;
+                int[] mapping = (sourceDay % 3 == 0) ? new int[2] { 1, 4 } : new int[2] { 0, 3 };
+                timeDiff = 0;
+
+                for (int i = 0; i < 2; i++)
+                {
+                    source = (i == 0) ? source : source.siblings[0];
+
+                    targetList = oplossing.MappingToList(mapping[i], rnd.Next(2));
+                    targetIndex = oplossing.pickRandomStop(targetList);
+                    if (targetIndex == null)
+                    {
+                        return false;
+                    }
+
+                    target = targetList[(int)targetIndex];
+
+                    sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
+                    - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
+                    - afstandenMatrix[source.matrixId, source.next.matrixId, 1]
+                    - source.loadingTime;
+                    targetTimeDiff = afstandenMatrix[target.matrixId, source.matrixId, 1]
+                        + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                        - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
+                        + source.loadingTime;
+                    timeDiff += sourceTimeDiff + targetTimeDiff;
+
+                    stopsToShift[i] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
+                }
+            }
+            else // cant switch between days if freq -- 3
+            {
+                return false;
+            }
+
+
+            if (timeDiff <= 0) // if the change is an improvement follow through
+            {
+                return true;
+            }
+            else if (RollChance(timeDiff)) // if the chance roll returns true, follow through
+            {
+                return true;
+            }
+
+            return false; // else don't follow through
+
         }
 
         private bool ConsiderRemove(CollectionStop removeNode, out float penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove)
@@ -436,19 +406,19 @@ namespace GroteOPTOpdracht
             penaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
 
             float totalTimeDiff = 0;
+            float timeDiff;
+            int c = 0;
 
-            int arrayCounter = 0;
-
-            foreach (CollectionStop s in removeNode.siblings.Concat(new[] { removeNode }))
+            foreach (CollectionStop s in removeNode.siblings.Append(removeNode))
             {
-                float timeDiff = -(s.loadingTime + afstandenMatrix[s.prev.matrixId, s.matrixId, 1]
+                timeDiff = -(s.loadingTime + afstandenMatrix[s.prev.matrixId, s.matrixId, 1]
                                                   + afstandenMatrix[s.matrixId, s.next.matrixId, 1]
                                                   - afstandenMatrix[s.prev.matrixId, s.next.matrixId, 1]);
-                stopsToRemove[arrayCounter] = ((s, timeDiff, oplossing.MappingToList(s.dayStop.day, s.dayStop.truckId)));
-                arrayCounter++;
+
+                stopsToRemove[c] = ((s, timeDiff, oplossing.MappingToList(s.dayStop.day, s.dayStop.truckId)));
+                c++;
                 totalTimeDiff += timeDiff;
             }
-
 
             float scoreDiff = totalTimeDiff + penaltyDiff;
 
@@ -468,144 +438,123 @@ namespace GroteOPTOpdracht
 
         private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff)
         {
+            List<CollectionStop> targetList;
+            CollectionStop source;
+            CollectionStop target;
+            int? targetIndex;
+            int targetDay;
             stopsToAdd = new (CollectionStop, CollectionStop, float, List<CollectionStop>)[newStop.frequency];
-            int arrayCounter = 0;
+
+            float timeDiff;
             float totalTimeDiff = 0;
 
             penaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
 
-
-
-            int rndInt;
-
+            // find targets (destinations) for each stop in order that will be added
             if (newStop.frequency == 1)
             {
-                int day = rnd.Next(5);
-                int stopTruck = rnd.Next(2);
-                List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
-                int? insertIndex = oplossing.pickRandomStop(ls);
-                if (insertIndex == null)
+                targetList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
                 {
                     return false;
                 }
 
-                CollectionStop insertLocStop = ls[(int)insertIndex];
-
-                stopsToAdd[arrayCounter] = (newStop, insertLocStop, 0f, ls);
-                arrayCounter++;
-
+                target = targetList[(int)targetIndex];
+                stopsToAdd[0] = (newStop, target, 0f, targetList);
             }
             else if (newStop.frequency == 2)
             {
-                int day1 = rnd.Next(2);
-                int stopTruck1 = rnd.Next(2);
-                List<CollectionStop> ls1 = oplossing.MappingToList(day1, stopTruck1);
-                int? insertIndex1 = oplossing.pickRandomStop(ls1);
-                if (insertIndex1 == null)
+                targetDay = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
                 {
                     return false;
                 }
 
-                CollectionStop insertLocStop1 = ls1[(int)insertIndex1];
+                target = targetList[(int)targetIndex];
+                stopsToAdd[0] = (newStop, target, 0f, targetList);
 
-                stopsToAdd[arrayCounter] = (newStop, insertLocStop1, 0f, ls1);
-                arrayCounter++;
-
-
-                CollectionStop sibling = newStop.siblings[0];
-                int day2 = day1 + 3;
-                int stopTruck2 = rnd.Next(2);
-                List<CollectionStop> ls2 = oplossing.MappingToList(day2, stopTruck2);
-                int? insertIndex2 = oplossing.pickRandomStop(ls2);
-                if (insertIndex2 == null)
+                source = newStop.siblings[0];
+                targetList = oplossing.MappingToList((targetDay + 3), rnd.Next(2));
+                targetIndex = oplossing.pickRandomStop(targetList);
+                if (targetIndex == null)
                 {
                     return false;
                 }
 
-                CollectionStop insertLocStop2 = ls2[(int)insertIndex2];
+                target = targetList[(int)targetIndex];
 
-                stopsToAdd[arrayCounter] = (sibling, insertLocStop2, 0f, ls2);
-                arrayCounter++;
-
-
-
+                stopsToAdd[1] = (source, target, 0f, targetList);
             }
             else if (newStop.frequency == 3)
             {
                 int c = 0;
-                foreach (CollectionStop cStop in newStop.siblings.Concat(new[] { newStop }))
+                foreach (CollectionStop cStop in newStop.siblings.Append(newStop))
                 {
-
-                    int day = c;
-                    int stopTruck = rnd.Next(2);
-                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
-                    int? insertIndex = oplossing.pickRandomStop(ls);
-                    if (insertIndex == null)
+                    targetDay = c * 2;
+                    targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                    targetIndex = oplossing.pickRandomStop(targetList);
+                    if (targetIndex == null)
                     {
                         return false;
                     }
 
-                    CollectionStop insertLocStop = ls[(int)insertIndex];
+                    target = targetList[(int)targetIndex];
 
-                    stopsToAdd[arrayCounter] = (cStop, insertLocStop, 0f, ls);
-                    arrayCounter++;
-
-
-                    c += 2;
+                    stopsToAdd[c] = (cStop, target, 0f, targetList);
+                    c += 1;
                 }
             }
             else if (newStop.frequency == 4)
             {
-                rndInt = rnd.Next(5);
-                int day = 0;
+                int r = rnd.Next(5);
+                int c = 0;
+                targetDay = 0;
 
                 foreach (CollectionStop cStop in newStop.siblings.Append(newStop))
                 {
-                    if (day == rndInt) day++;
+                    if (targetDay == r) targetDay++;
 
-
-                    int stopTruck = rnd.Next(2);
-                    List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
-                    int? insertIndex = oplossing.pickRandomStop(ls);
-                    if (insertIndex == null)
+                    targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                    targetIndex = oplossing.pickRandomStop(targetList);
+                    if (targetIndex == null)
                     {
                         return false;
                     }
 
-                    CollectionStop insertLocStop = ls[(int)insertIndex];
+                    target = targetList[(int)targetIndex];
 
-                    stopsToAdd[arrayCounter] = (cStop, insertLocStop, 0f, ls);
-                    arrayCounter++;
-
-                    day++;
+                    stopsToAdd[c] = (cStop, target, 0f, targetList);
+                    c++;
+                    targetDay++;
                 }
             }
 
+            // Consider each of the source - target (destination) pairs and evaluate
             for (int i = 0; i < stopsToAdd.Length; i++)
             {
-                var v = stopsToAdd[i];
-                CollectionStop nStop = v.Item1;
-                CollectionStop iStop = v.Item2;
+                (source, target, timeDiff, targetList) = stopsToAdd[i];
                 
                 // check if adding this node would exceed the cargoSpace 
-                if ((iStop.ofloadStop.volume + nStop.containerCount * nStop.containerVolume) > oplossing.cargoSpace)
+                if ((target.ofloadStop.volume + source.containerCount * source.containerVolume) > oplossing.cargoSpace)
                 {
                     return false;
                 }
 
-
-                float timeDiff = nStop.loadingTime + afstandenMatrix[iStop.matrixId, nStop.matrixId, 1]
-                                + afstandenMatrix[nStop.matrixId, iStop.next.matrixId, 1]
-                                - afstandenMatrix[iStop.matrixId, iStop.next.matrixId, 1];
+                timeDiff = source.loadingTime + afstandenMatrix[target.matrixId, source.matrixId, 1]
+                                + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                                - afstandenMatrix[target.matrixId, target.next.matrixId, 1];
                 totalTimeDiff += timeDiff;
                 
 
-                if (timeDiff + iStop.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                if (timeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
                 {
                     return false;
                 }
 
-                stopsToAdd[i] = (nStop, iStop, timeDiff, v.Item4);
+                stopsToAdd[i] = (source, target, timeDiff, targetList);
             }
 
 
