@@ -31,11 +31,11 @@ namespace GroteOPTOpdracht
 
     public class DayStop : Stop // divider node for when day is finished
     {
-        public string day;
+        public int day;
         public float dayTime; // track how much time is spent in this day driving and loading/ofloading
         public int truckId;
 
-        public DayStop(string day, int dagTijd, int truckID) : base (287)
+        public DayStop(int day, int dagTijd, int truckID) : base (287)
         {
             this.day = day;
             this.dayTime = dagTijd;

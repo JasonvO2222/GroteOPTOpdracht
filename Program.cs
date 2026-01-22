@@ -53,8 +53,11 @@ namespace GroteOPTOpdracht
             SimulatedAnnealing sa = new SimulatedAnnealing(afstandenMatrix,
                 ls, penalty, 600, 20, 0.985f, 100000, 1000);
             double score = sa.GetScore();
+            (double t, double pen) = sa.GetScoreDetailed();
             sa.OutputSolution();
             Console.WriteLine($"{score}");
+            Console.WriteLine($"time: {t}");
+            Console.WriteLine($"pen: {pen}");
             return;
 
 

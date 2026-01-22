@@ -65,8 +65,8 @@ namespace GroteOPTOpdracht
 
             // Create day divider nodes and connect them (each DayStop is a node which divides the linkedlist into days twice for both trucks)
             dayStops = new DayStop[11];
-            String[] days = new String[10] {"monday", "tuesday", "wednesday", "thursday", "friday", "monday", "tuesday", "wednesday", "thursday", "friday" };
-            dayStops[0] = new DayStop("start", 0, -1);
+            int[] days = new int[10] {0, 1, 2, 3, 4, 0, 1, 2, 3, 4 };
+            dayStops[0] = new DayStop(-1, 0, -1);
             leftMostDayStop = dayStops[0];
             for (int j = 0; j < 2; j++)
             {
@@ -74,8 +74,8 @@ namespace GroteOPTOpdracht
                 for (int i = 0; i < 5; i++)
                 {
                     x = j * 5 + i;
-                    DayStop dStop = new DayStop(days[x], 0, j);
-                    dayStops[x + 1] = dStop;
+                    DayStop d = new DayStop(days[x], 0, j);
+                    dayStops[x + 1] = d;
                 }
             }
 
@@ -84,233 +84,135 @@ namespace GroteOPTOpdracht
             {
                 int l = i - 1; //last daystop index
 
-                OfloadStop oStop = new OfloadStop(0);
+                OfloadStop o = new OfloadStop(0);
 
-                dayStops[l].next = oStop;
-                oStop.prev = dayStops[l];
-                oStop.next = dayStops[i];
-                dayStops[i].prev = oStop;
+                dayStops[l].next = o;
+                o.prev = dayStops[l];
+                o.next = dayStops[i];
+                dayStops[i].prev = o;
+
+                dayStops[i].dayTime += 1800;
+                tijd += 1800;
             }
 
-            // fill each day to the max with stops as a starting solution
-            foreach (DayStop dStop in dayStops)
+
+            // prepare some variables for making starting solution
+            (CollectionStop, int, int)[] toCheck = new (CollectionStop, int, int)[4];
+            (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)[] checkedStops = new (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)[4];
+            int day;
+            bool fits;
+            List<CollectionStop> destination;
+            CollectionStop s;
+
+            // variables for casting into from the checkedStops list
+            CollectionStop stop;
+            DayStop dStop;
+            OfloadStop oStop;
+            int volumeCheck;
+            float timeCheck;
+
+            // make starting solution by iterating over stops and handling it according to frequency
+            while (orderList.Count > 0)
             {
-                if (dStop.day == "start") continue;
-
-                bool maxTimeReached = false;
-                bool maxLoadReached = false;
-
-                while (!maxTimeReached && !maxLoadReached && orderList.Count > 0) //now fill with collection stops until cargo is full or stops empty
+                s = orderList[0];
+                int freq = s.frequency;
+                if (freq == 1)
                 {
-                    CollectionStop stop = orderList[0];
-
-                    int freq = stop.frequency;
-                    string day = dStop.day;
-
-                    int truck = dStop.truckId; 
-                    bool correctionFlag = false;
-
-                    // skip if a multiple stop order cant be correctly inserted anymore because the days before
-                    if ((freq == 3 && dStop.day != "monday") || ((freq == 2 || freq == 4) && (dStop.day != "monday" && dStop.day != "tuesday")))
-                    {
-                        if (truck == 0 && freq == 3) //if we are only on truck 0 past tuesday we can add it to truck 1 instead
-                        {
-                            truck = 1;
-                            day = "monday";
-                            if (freq != 3 && 1 == rnd.Next(2)) day = "tuesday";
-                            correctionFlag = true; //this flag lets us know we are now looking at a different DayStop than orginally
-                        }
-                        else {          //otherwise an order with freq>2 can not be added anymore so we remove it and its siblings
-
-                            int lastIndex = orderList.Count - 1;
-                            (orderList[0], orderList[lastIndex]) = (orderList[lastIndex], orderList[0]);
-                            stop.index = ignore.Count;
-                            ignore.Add(orderList[lastIndex]);
-                            orderList.RemoveAt(lastIndex);
-
-
-                            foreach (CollectionStop cStop in stop.siblings)
-                            {
-                                lastIndex--;
-                                int id = orderList.IndexOf(cStop); //sadly O(n) but cant be helped
-                                (orderList[id], orderList[lastIndex]) = (orderList[lastIndex], orderList[id]);
-                                cStop.index = ignore.Count;
-                                ignore.Add(orderList[lastIndex]);
-                                orderList.RemoveAt(lastIndex);
-                            }
-
-                            continue;
-                        }
-                    }
-
-
-
-                    (bool, CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float, bool, bool)[] ordersToAdd = new (bool, CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float, bool, bool)[freq];
-
-
-                    ordersToAdd[0] = (CheckIfFits(stop, day, truck)); //check if the stop can be added
-                    if ((ordersToAdd[0].Item8 == true || ordersToAdd[0].Item9) && !correctionFlag) // if the volume of the ofloadstop/time in day is full/up and we are still on the same DayStop, we move on to next DayStop
-                    {
-                        maxLoadReached = ordersToAdd[0].Item8;
-                        maxTimeReached = ordersToAdd[0].Item9;
-
-                        continue;
-                    }
-
-                    int tId = (truck == 0) ? rnd.Next(2) : 1; // choose which truck it goes in, if we are on truck 1 (either because truck 0 is full or we aren't on the original daystop anymore), we try to add siblings to truck 1
-                    //what truck the sibling(s) go(es) in is random, if CheckIfFits returns false, the other truck isnt checked (except if we are not on the original daystop(we switched to truck 1), in which case truck 0 is also tested)
-                    if (freq == 2) //checking siblings freq=2
-                    {
-                        if (day == "monday")
-                        {
-                            ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "thursday", tId));
-                            if (ordersToAdd[1].Item1 == false && correctionFlag)
-                            {
-                                ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "thursday", 0));
-                            }
-                        }
-                        else
-                        {
-                            ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "friday", tId));
-                            if (ordersToAdd[1].Item1 == false && correctionFlag)
-                            {
-                                ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "friday", 0));
-                            }
-                        }
-                    }
-                    if (freq == 3)//checking siblings freq=3
-                    {
-                        ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "wednesday", tId));
-                        if (ordersToAdd[1].Item1 == false && correctionFlag)
-                        {
-                            ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "wednesday", 0));
-                        }
-                        tId = (truck == 0) ? rnd.Next(2) : 1;
-                        ordersToAdd[2] = (CheckIfFits(stop.siblings[1], "friday", tId));
-                        if (ordersToAdd[2].Item1 == false && correctionFlag)
-                        {
-                            ordersToAdd[2] = (CheckIfFits(stop.siblings[1], "friday", 0));
-                        }
-                    }
-                    if (freq == 4) //checking siblings freq=4
-                    {
-                        if (day == "monday")
-                        {
-                            string[] s = { "tuesday", "wednesday", "thursday", "friday"};
-                            int r = rnd.Next(4);
-                            int c = 1;
-                            for (int i = 0; i < 4; i++)
-                            {
-                                if (r == i) continue;
-                                ordersToAdd[c] = (CheckIfFits(stop.siblings[c - 1], s[i], tId));
-                                if (ordersToAdd[c].Item1 == false && correctionFlag)
-                                {
-                                    ordersToAdd[c] = (CheckIfFits(stop.siblings[c - 1], s[i], 0));
-                                }
-                                tId = (truck == 0) ? rnd.Next(2) : 1;
-                                c++;
-                            }
-                        }
-                        if (day == "tuesday")
-                        {
-                            ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "wednesday", tId));
-                            if (ordersToAdd[1].Item1 == false && correctionFlag)
-                            {
-                                ordersToAdd[1] = (CheckIfFits(stop.siblings[0], "wednesday", 0));
-                            }
-
-                            tId = (truck == 0) ? rnd.Next(2) : 1;
-                            ordersToAdd[2] = (CheckIfFits(stop.siblings[1], "thursday", tId));
-                            if (ordersToAdd[2].Item1 == false && correctionFlag)
-                            {
-                                ordersToAdd[2] = (CheckIfFits(stop.siblings[1], "thursday", 0));
-                            }
-
-                            tId = (truck == 0) ? rnd.Next(2) : 1;
-                            ordersToAdd[3] = (CheckIfFits(stop.siblings[2], "friday", tId));
-                            if (ordersToAdd[3].Item1 == false && correctionFlag)
-                            {
-                                ordersToAdd[3] = (CheckIfFits(stop.siblings[2], "friday", 0));
-                            }
-                        }
-                    }
-
-                    bool acc = true; 
-                    foreach (var v in ordersToAdd) // check if all siblings and original stop can be added
-                    {
-                        acc = acc && v.Item1;
-                    }
-
-                    if (acc) // if true add
-                    {
-                        foreach (var v in ordersToAdd)
-                        {
-                            CollectionStop CStop = v.Item2;
-                            DayStop DStop = v.Item3;
-                            OfloadStop OStop = v.Item4;
-                            List<CollectionStop> list = v.Item5;
-                            int volumeCheck = v.Item6;
-                            float timeCheck = v.Item7;
-
-                            // if it is possible update the ofload and day stop node with the new values
-                            OStop.volume = volumeCheck;
-                            DStop.dayTime = timeCheck;
-                            tijd = tijd + afstandenMatrix[CStop.matrixId, OStop.matrixId, 1]
-                                        + afstandenMatrix[OStop.prev.matrixId, CStop.matrixId, 1]
-                                        - afstandenMatrix[OStop.prev.matrixId, OStop.matrixId, 1]
-                                        + CStop.loadingTime;
-
-                            // and reddirect the pointers to the correct nodes
-                            OStop.prev.next = CStop;
-                            CStop.prev = OStop.prev;
-                            OStop.prev = CStop;
-                            CStop.next = OStop;
-                            CStop.ofloadStop = OStop;
-                            CStop.dayStop = DStop;
-
-
-
-                            CStop.included = true;
-
-                            //remove from orderlist and add to right stoplist
-                            int lastIndex = orderList.Count - 1;
-                            int id = orderList.IndexOf(CStop); //sadly O(n) but cant be helped
-                            (orderList[id], orderList[lastIndex]) = (orderList[lastIndex], orderList[id]);
-                            CStop.index = list.Count;
-                            list.Add(orderList[lastIndex]);
-                            orderList.RemoveAt(lastIndex);
-
-                        }
-
-                        penalty -= (3 * stop.loadingTime * stop.frequency);
-                    }
-                    else //else remove and put in ignore
-                    {
-                        foreach (var v in ordersToAdd)
-                        {
-                            CollectionStop CStop = v.Item2;
-                            //remove from orderlist and add to ignore
-                            int lastIndex = orderList.Count - 1;
-                            int id = orderList.IndexOf(CStop); //sadly O(n) but cant be helped
-                            (orderList[id], orderList[lastIndex]) = (orderList[lastIndex], orderList[id]);
-                            CStop.index = ignore.Count;
-                            ignore.Add(orderList[lastIndex]);
-                            orderList.RemoveAt(lastIndex);
-                        }
-
-                    }
+                    (fits, checkedStops[0]) = CheckSingle(s, rnd.Next(5), rnd.Next(2));
                 }
+                else if (freq == 2)
+                {
+                    day = rnd.Next(2);
+                    toCheck[0] = (s, day, rnd.Next(2));
+                    day += 3;
+                    toCheck[1] = (s.siblings[0], day, rnd.Next(2));
+
+                    (fits, checkedStops) = CheckAll(toCheck, freq);
+                }
+                else if (freq == 3)
+                {
+                    toCheck[0] = (s, 0, rnd.Next(2));
+                    toCheck[1] = (s.siblings[0], 2, rnd.Next(2));
+                    toCheck[2] = (s.siblings[1], 4, rnd.Next(2));
+
+                    (fits, checkedStops) = CheckAll(toCheck, freq);
+                }
+                else
+                {
+                    int r = rnd.Next(5);
+                    int c = 0;
+                    day = 0;
+                    foreach (CollectionStop cStop in s.siblings.Append(s))
+                    {
+                        if (day == r) day++;
+                        toCheck[c] = (cStop, day, rnd.Next(2));
+                        day++;
+                        c++;
+                    }
+
+                    (fits, checkedStops) = CheckAll(toCheck, freq);
+                }
+
+
+
+                if (fits) // true if all stops in order can be added
+                {
+                    for (int i = 0; i < freq; i ++)
+                    {
+                        (stop, dStop, oStop, destination, volumeCheck, timeCheck) = checkedStops[i];
+                        
+
+                        // if it is possible update the ofload and day stop node with the new values
+                        oStop.volume = volumeCheck;
+                        dStop.dayTime = timeCheck;
+                        tijd = tijd + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
+                                    + afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
+                                    - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
+                                    + stop.loadingTime;
+
+                        // and reddirect the pointers to the correct nodes
+                        oStop.prev.next = stop;
+                        stop.prev = oStop.prev;
+                        oStop.prev = stop;
+                        stop.next = oStop;
+                        stop.ofloadStop = oStop;
+                        stop.dayStop = dStop;
+
+
+
+                        stop.included = true;
+
+                        //remove from orderlist and add to right stoplist
+                        int lastIndex = orderList.Count - 1;
+                        int id = orderList.IndexOf(stop); //sadly O(n) but cant be helped
+                        (orderList[id], orderList[lastIndex]) = (orderList[lastIndex], orderList[id]);
+                        stop.index = destination.Count;
+                        destination.Add(orderList[lastIndex]);
+                        orderList.RemoveAt(lastIndex);
+
+                    }
+
+                    penalty -= (3 * s.loadingTime * s.frequency);
+                }
+                else //else remove and put in ignore
+                {
+                    for (int i = 0; i < freq; i++)
+                    {
+                        (stop, dStop, oStop, destination, volumeCheck, timeCheck) = checkedStops[i];
+                        //remove from orderlist and add to ignore
+                        int lastIndex = orderList.Count - 1;
+                        int id = orderList.IndexOf(stop); //sadly O(n) but cant be helped
+                        (orderList[id], orderList[lastIndex]) = (orderList[lastIndex], orderList[id]);
+                        stop.index = ignore.Count;
+                        ignore.Add(orderList[lastIndex]);
+                        orderList.RemoveAt(lastIndex);
+                    }
+
+                }
+
             }
 
-            int co = ignore.Count;
-            foreach (CollectionStop s in orderList)
-            {
-                s.index = co;
-                ignore.Add(s);
-                co++;
-            }
-            
-
+            // debug 
             foreach (var v in monday0.Concat(monday1.Concat(tuesday0.Concat(tuesday1.Concat(wednesday0.Concat(wednesday1.Concat(thursday0.Concat(thursday1.Concat(friday0.Concat(friday1)))))))))) {
 
                 Console.WriteLine(v.index);
@@ -321,30 +223,51 @@ namespace GroteOPTOpdracht
             }
         }
 
-
-        private (bool, CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float, bool, bool) CheckIfFits(CollectionStop stop, string day, int truck)
+        // Checks if all stops in the input (from one order) will fit in the randomly chosen days/trucks
+        private (bool, (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)[]) CheckAll((CollectionStop, int, int)[] ls, int freq )
         {
-            // check if it fits in the leftover cargospace before the dropoff
-            // also check if the extra time for the stop fits in the time left in the day
-            DayStop dStop = MappingToDayStop(day, truck);
-            OfloadStop oStop = (OfloadStop)dStop.prev;
-            List<CollectionStop> list = MappingToList(day, truck);
-            bool maxLoadReached = false;
-            bool maxTimeReached = false;
-            bool elligible = true;
+            (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)[] res = new (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)[4];
+            int count = 0;
+            bool bAccumulator = true;
 
-            int volumeCheck = oStop.volume + (stop.containerCount * stop.containerVolume);
-            if (volumeCheck > cargoSpace) { maxLoadReached = true; elligible = false; }
+            bool b;
+            CollectionStop stop;
+            DayStop dStop;
+            OfloadStop oStop;
+            int volumeCheck;
+            float timeCheck;
 
-            float timeCheck = dStop.dayTime + afstandenMatrix[stop.matrixId, oStop.matrixId, 1]
-                                            + afstandenMatrix[oStop.prev.matrixId, stop.matrixId, 1]
-                                            - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
-                                            + stop.loadingTime;
-            if (timeCheck > maxDayTime) { maxTimeReached = true; elligible = false; }
+            for (int i = 0; i < freq; i++)
+            {
+                (CollectionStop s, int day, int truck) = ls[i];
+                (b, res[count]) = CheckSingle(s, day, truck);
+                bAccumulator &= b;
+                count++;
+            }
 
-            return (elligible, stop, dStop, oStop, list, volumeCheck, timeCheck, maxLoadReached, maxTimeReached);
+            return (bAccumulator, res);
         }
 
+        // Checks if a stop will fit in the randomly chosen day/truck
+        private (bool, (CollectionStop, DayStop, OfloadStop, List<CollectionStop>, int, float)) CheckSingle(CollectionStop s, int day, int truck)
+        {
+            List<CollectionStop> sList = MappingToList(day, truck);
+            DayStop dStop = MappingToDayStop(day, truck);
+            OfloadStop oStop = (OfloadStop)dStop.prev;
+            bool b = true;
+
+            int volumeCheck = oStop.volume + (s.containerCount * s.containerVolume);
+            if (volumeCheck > cargoSpace) { b = false; }
+
+            float timeCheck = dStop.dayTime + afstandenMatrix[s.matrixId, oStop.matrixId, 1]
+                                            + afstandenMatrix[oStop.prev.matrixId, s.matrixId, 1]
+                                            - afstandenMatrix[oStop.prev.matrixId, oStop.matrixId, 1]
+                                            + s.loadingTime;
+            if (timeCheck > maxDayTime) { b = false; }
+
+            return (b, (s, dStop, oStop, sList, volumeCheck,  timeCheck));
+
+        }
 
         public void AddStop(int id, List<CollectionStop> dayTruckList)
         {
@@ -461,7 +384,7 @@ namespace GroteOPTOpdracht
                     DayStop r = (DayStop)s;
                     dagId++;
                     counter = 1;
-                    if(r.day == "friday") {; truck = 2; dagId = 1; } //once the friday DayStop node has passed switch to truck 2
+                    if(r.day == 4) {; truck = 2; dagId = 1; } //once the friday DayStop node has passed switch to truck 2
                 }
 
                 else if(s is CollectionStop)
@@ -571,87 +494,84 @@ namespace GroteOPTOpdracht
         }
 
 
-        public List<CollectionStop> MappingToList(string day, int truck)
+        public List<CollectionStop> MappingToList(int day, int truck)
         {
             switch (day, truck)
             {
-                case ("monday", 0):
+                case (0, 0):
                     return monday0;
-                case ("monday", 1):
+                case (0, 1):
                     return monday1;
-                case ("tuesday", 0):
+                case (1, 0):
                     return tuesday0;
-                case ("tuesday", 1):
+                case (1, 1):
                     return tuesday1;
-                case ("wednesday", 0):
+                case (2, 0):
                     return wednesday0;
-                case ("wednesday", 1):
+                case (2, 1):
                     return wednesday1;
-                case ("thursday", 0):
+                case (3, 0):
                     return thursday0;
-                case ("thursday", 1):
+                case (3, 1):
                     return thursday1;
-                case ("friday", 0):
+                case (4, 0):
                     return friday0;
-                case ("friday", 1):
+                case (4, 1):
                     return friday1;
             }
             return new List<CollectionStop>(); //this shouldnt happen
         }
 
-        public (string, int) MappingFromList(List<CollectionStop> ls )
+        public (int, int) MappingFromList(List<CollectionStop> ls )
         {
             if (ls.Equals(monday0))
             {
-                return ("monday", 0);
+                return (0, 0);
             }
             if (ls.Equals(monday1))
             {
-                return ("monday", 1);
+                return (0, 1);
             }
             if (ls.Equals(tuesday0))
             {
-                return ("tuesday", 0);
+                return (1, 0);
             }
             if (ls.Equals(tuesday1))
             {
-                return ("tuesday", 1);
+                return (1, 1);
             }
             if (ls.Equals(wednesday0))
             {
-                return ("wednesday", 0);
+                return (2, 0);
             }
             if (ls.Equals(wednesday1))
             {
-                return ("wednesday", 1);
+                return (2, 1);
             }
             if (ls.Equals(thursday0))
             {
-                return ("tursday", 0);
+                return (3, 0);
             }
             if (ls.Equals(thursday1))
             {
-                return ("tursday", 1);
+                return (3, 1);
             }
             if (ls.Equals(friday0))
             {
-                return ("friday", 0);
+                return (4, 0);
             }
             if (ls.Equals(friday1))
             {
-                return ("friday", 1);
+                return (4, 1);
             }
 
 
-            return ("false", -1); //this shouldnt happen
+            return (-1, -1); //this shouldnt happen
         }
 
-        public DayStop MappingToDayStop(string day, int truck)
+        public DayStop MappingToDayStop(int day, int truck)
         {
-            List<string> s = new List<string>{ "monday", "tuesday", "wednesday", "thursday", "friday" };
-            int index = s.IndexOf(day);
-            index = index + 5 * truck + 1;
-            return dayStops[index];
+            return dayStops[((day + 1) + (truck * 5))];
         }
 
     }

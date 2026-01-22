@@ -21,7 +21,6 @@ namespace GroteOPTOpdracht
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
         private static readonly Random rnd = new Random();
-        private readonly List<string> days = new List<string>{ "monday", "tuesday", "wednesday", "thursday", "friday" };
 
         public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations, int iterationsTConstant)
         {
@@ -42,6 +41,10 @@ namespace GroteOPTOpdracht
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
 
 
+            return;
+
+
+
             // Simulated Annealing
             // Either add/remove/swap action
             // Need one index for remove and 2 for swap
@@ -50,35 +53,6 @@ namespace GroteOPTOpdracht
             bool TFlag = true;
             while (z <= zLim)
             {
-
-                //Console.WriteLine("m0");
-                //Console.WriteLine(oplossing.monday0.Count);
-                //Console.WriteLine("m1");
-                //Console.WriteLine(oplossing.monday1.Count);
-                //Console.WriteLine("t0");
-                //Console.WriteLine(oplossing.tuesday0.Count);
-                //Console.WriteLine("t1");
-                //Console.WriteLine(oplossing.tuesday1.Count);
-                //Console.WriteLine("w0");
-                //Console.WriteLine(oplossing.wednesday0.Count);
-                //Console.WriteLine("w1");
-                //Console.WriteLine(oplossing.wednesday1.Count);
-                //Console.WriteLine("t0");
-                //Console.WriteLine(oplossing.thursday0.Count);
-                //Console.WriteLine("t1");
-                //Console.WriteLine(oplossing.thursday1.Count);
-                //Console.WriteLine("f0");
-                //Console.WriteLine(oplossing.friday0.Count);
-                //Console.WriteLine("f1");
-                //Console.WriteLine(oplossing.friday1.Count);
-                //Console.WriteLine("total");
-                //Console.WriteLine(oplossing.monday0.Count + oplossing.monday1.Count + oplossing.tuesday0.Count + oplossing.tuesday1.Count +
-                //   oplossing.wednesday0.Count + oplossing.wednesday1.Count + oplossing.thursday0.Count + oplossing.thursday1.Count +
-                //   oplossing.friday0.Count + oplossing.friday1.Count);
-                //Console.WriteLine("ignore");
-                //Console.WriteLine(oplossing.ignore.Count);
-                //Console.ReadLine();
-
 
                 if (z % Q == 0 && TFlag) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
@@ -99,15 +73,14 @@ namespace GroteOPTOpdracht
                 {
                     //continue;
 
-                    rndInt = rnd.Next(5);
-                    string day1 = days[rndInt];
+                    int day1 = rnd.Next(5);
                     int stop1Truck = rnd.Next(2);
                     List<CollectionStop> list1 = oplossing.MappingToList(day1, stop1Truck);
                     int? index1 = oplossing.pickRandomStop(list1);
                     if (index1 == null) { continue; }
                     CollectionStop stop1 = list1[(int)index1];
 
-                    string day2 = "";
+                    int day2 = -1;
                     int stop2Truck = rnd.Next(2);
 
 
@@ -120,9 +93,9 @@ namespace GroteOPTOpdracht
                         int dayTotal = 10;
                         foreach (CollectionStop c in stop1.siblings.Concat(new[] { stop1 }))
                         {
-                            dayTotal -= MapDayToInt(c.dayStop.day);
+                            dayTotal -= c.dayStop.day;
                         }
-                        day2 = (rnd.Next(2) == 1) ? day1 : days[dayTotal];
+                        day2 = (rnd.Next(2) == 1) ? day1 : dayTotal;
                     }
                     else if (stop1.frequency == 2)
                     {
@@ -206,8 +179,7 @@ namespace GroteOPTOpdracht
 
                     //continue;
 
-                    rndInt = rnd.Next(5);
-                    string day = days[rndInt];
+                    int day = rnd.Next(5);
                     int stopTruck = rnd.Next(2);
                     List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
                     int? indexRemove = oplossing.pickRandomStop(ls);
@@ -241,8 +213,7 @@ namespace GroteOPTOpdracht
 
                 else if (action == 3) // shift
                 {
-                    rndInt = rnd.Next(5);
-                    string day = days[rndInt];
+                    int day = rnd.Next(5);
                     int truck = rnd.Next(2);
                     List<CollectionStop> shiftFromList = oplossing.MappingToList(day, truck);
                     int? index = oplossing.pickRandomStop(shiftFromList);
@@ -296,7 +267,7 @@ namespace GroteOPTOpdracht
                     {
                         // Initialize stop we want to shift to
                         int shiftToTruck;
-                        string shiftToDay;
+                        int shiftToDay;
                         List<CollectionStop> shiftToList;
                         int? indexStopShiftAfter;
 
@@ -305,7 +276,7 @@ namespace GroteOPTOpdracht
                             case 1:
                                 // Initialize stop we want to shift to
                                 shiftToTruck = rnd.Next(2);
-                                shiftToDay = days[rnd.Next(5)];
+                                shiftToDay = rnd.Next(5);
                                 shiftToList = oplossing.MappingToList(shiftToDay, shiftToTruck);
                                 indexStopShiftAfter = oplossing.pickRandomStop(shiftToList);
                                 if (indexStopShiftAfter == shiftToList.Count - 1 || indexStopShiftAfter == index || indexStopShiftAfter == null) continue;
@@ -316,13 +287,13 @@ namespace GroteOPTOpdracht
                                     ActualShift((int)index, shiftStop, stopShiftAfter, shiftFromList, shiftToList, consideredShift1.Item2, consideredShift1.Item3, consideredShift1.Item4);
                                 break;
                             case 2: 
-                                if (shiftStop.dayStop.day == "monday" || shiftStop.dayStop.day == "thursday")
+                                if (shiftStop.dayStop.day == 0 || shiftStop.dayStop.day == 3)
                                 {
-                                    (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2(["tuesday", "friday"], shiftStop);
+                                    (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2([1, 4], shiftStop);
                                 }
-                                else if (shiftStop.dayStop.day == "tuesday" || shiftStop.dayStop.day == "friday")
+                                else if (shiftStop.dayStop.day == 1 || shiftStop.dayStop.day == 4)
                                 {
-                                    (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2(["monday", "thursday"], shiftStop);
+                                    (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) stopShiftAfters = InitializeFreq2([0, 3], shiftStop);
                                     if (stopShiftAfters == (null, null, null, null, null, null)) break;
                                     (bool, float, float, float) consideredShift21 = considerShift(stopShiftAfters.Item6[0].index, stopShiftAfters.Item6[0], stopShiftAfters.Item5[0], oplossing.MappingToList(stopShiftAfters.Item6[0].dayStop.day, stopShiftAfters.Item6[0].dayStop.truckId), stopShiftAfters.Item3[0]);
                                     (bool, float, float, float) consideredShift22 = considerShift(stopShiftAfters.Item6[1].index, stopShiftAfters.Item6[1], stopShiftAfters.Item5[1], oplossing.MappingToList(stopShiftAfters.Item6[1].dayStop.day, stopShiftAfters.Item6[1].dayStop.truckId), stopShiftAfters.Item3[1]);
@@ -338,13 +309,13 @@ namespace GroteOPTOpdracht
                             case 4: // We have to force the stop to shift to the 'missing' day
                                 // Initialize stop to one in unused day
                                 shiftToTruck = rnd.Next(2);
-                                string unusedDay = "";
-                                List<string> siblingDays = new List<string>();
+                                int unusedDay = -1;
+                                List<int> siblingDays = new List<int>();
                                 foreach (CollectionStop sibling in shiftStop.siblings)
                                 {
                                     siblingDays.Add(sibling.dayStop.day);
                                 }
-                                foreach (string weekday in days) // Find day on which no sibling stop is
+                                for (int weekday = 0; weekday < 5; weekday++) // Find day on which no sibling stop is
                                 {
                                     if (!siblingDays.Contains(day) && day != shiftStop.dayStop.day)
                                         unusedDay = weekday;
@@ -370,12 +341,12 @@ namespace GroteOPTOpdracht
 
         }
 
-        private (int[], string[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) InitializeFreq2(List<string> dayShiftToOptions, CollectionStop shiftStopOriginal)
+        private (int[], int[], List<CollectionStop>[], int?[], CollectionStop[], CollectionStop[]) InitializeFreq2(List<int> dayShiftToOptions, CollectionStop shiftStopOriginal)
         {
             int shiftToTruck1;
             int shiftToTruck2;
-            string shiftToDay1;
-            string shiftToDay2;
+            int shiftToDay1;
+            int shiftToDay2;
             List<CollectionStop> shiftToList1;
             List<CollectionStop> shiftToList2;
             int? indexStopShiftAfter1;
@@ -403,7 +374,7 @@ namespace GroteOPTOpdracht
             stopShiftAfter2 = shiftToList2[(int)indexStopShiftAfter2];
 
             int[] shiftToTruck = { shiftToTruck1, shiftToTruck2 };
-            string[] shiftToDay = { shiftToDay1, shiftToDay2 };
+            int[] shiftToDay = { shiftToDay1, shiftToDay2 };
             List<CollectionStop>[] shiftToList = { shiftToList1, shiftToList2 };
             int?[] indexStopShiftAfter = { indexStopShiftAfter1, indexStopShiftAfter2 };
             CollectionStop[] stopShiftAfter = { stopShiftAfter1, stopShiftAfter2 };
@@ -509,8 +480,7 @@ namespace GroteOPTOpdracht
 
             if (newStop.frequency == 1)
             {
-                rndInt = rnd.Next(5);
-                string day = days[rndInt];
+                int day = rnd.Next(5);
                 int stopTruck = rnd.Next(2);
                 List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
                 int? insertIndex = oplossing.pickRandomStop(ls);
@@ -527,8 +497,7 @@ namespace GroteOPTOpdracht
             }
             else if (newStop.frequency == 2)
             {
-                rndInt = rnd.Next(2);
-                string day1 = days[rndInt];
+                int day1 = rnd.Next(2);
                 int stopTruck1 = rnd.Next(2);
                 List<CollectionStop> ls1 = oplossing.MappingToList(day1, stopTruck1);
                 int? insertIndex1 = oplossing.pickRandomStop(ls1);
@@ -544,7 +513,7 @@ namespace GroteOPTOpdracht
 
 
                 CollectionStop sibling = newStop.siblings[0];
-                string day2 = days[rndInt + 3];
+                int day2 = day1 + 3;
                 int stopTruck2 = rnd.Next(2);
                 List<CollectionStop> ls2 = oplossing.MappingToList(day2, stopTruck2);
                 int? insertIndex2 = oplossing.pickRandomStop(ls2);
@@ -567,7 +536,7 @@ namespace GroteOPTOpdracht
                 foreach (CollectionStop cStop in newStop.siblings.Concat(new[] { newStop }))
                 {
 
-                    string day = days[c];
+                    int day = c;
                     int stopTruck = rnd.Next(2);
                     List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
                     int? insertIndex = oplossing.pickRandomStop(ls);
@@ -588,14 +557,13 @@ namespace GroteOPTOpdracht
             else if (newStop.frequency == 4)
             {
                 rndInt = rnd.Next(5);
-                int c = 0;
+                int day = 0;
 
-                for (int i = 0; i < 5; i++)
+                foreach (CollectionStop cStop in newStop.siblings.Append(newStop))
                 {
-                    if (rndInt == i) continue;
-                    CollectionStop cStop = (c < 3) ? newStop.siblings[c] : newStop;
+                    if (day == rndInt) day++;
 
-                    string day = days[i];
+
                     int stopTruck = rnd.Next(2);
                     List<CollectionStop> ls = oplossing.MappingToList(day, stopTruck);
                     int? insertIndex = oplossing.pickRandomStop(ls);
@@ -609,8 +577,7 @@ namespace GroteOPTOpdracht
                     stopsToAdd[arrayCounter] = (cStop, insertLocStop, 0f, ls);
                     arrayCounter++;
 
-
-                    c++;
+                    day++;
                 }
             }
 
@@ -736,30 +703,17 @@ namespace GroteOPTOpdracht
 
         public double GetScore()
         {
-            return (oplossing.tijd + oplossing.penalty) / 60;
+            return (oplossing.tijd + oplossing.penalty);
+        }
+
+        public (double, double) GetScoreDetailed()
+        {
+            return (oplossing.tijd, oplossing.penalty);
         }
         public void OutputSolution()
         {
             oplossing.OutputSolution();
         }
 
-        public int MapDayToInt(string day)
-        {
-            switch (day) {
-                case "monday":
-                    return 0;
-                case "tuesday":
-                    return 1;
-                case "wednesday":
-                    return 2;
-                case "thursday":
-                    return 3;
-                case "friday":
-                    return 4;
-            }
-            Console.WriteLine("dikke error");
-            return -1; //shouldnt happen
-
-        }
     }
 }
