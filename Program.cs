@@ -1,12 +1,42 @@
 ﻿
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Globalization;
 
 namespace GroteOPTOpdracht
 {
+
+
+    public struct Parameters
+    {
+        public int T;
+        public int T_min;
+        public float T_factor;
+        public long iterations;
+        public long interval;
+        public int[] weights;
+        public int[] shiftWeights;
+
+        public Parameters(int T, int T_min, float T_factor, long iterations, long interval, int[] weights, int[] shiftWeights)
+        {
+            this.T = T;
+            this.T_min = T_min;
+            this.T_factor = T_factor;
+            this.iterations = iterations;
+            this.interval = interval;
+            this.weights = weights;
+            this.shiftWeights = shiftWeights;
+        } 
+    }
+
+
     public class Program
     {
+
+        private static readonly Random rnd = new Random();
+        public static float penalty = 640760.4f;
 
         public static void Main(string[] args)
         {
@@ -44,189 +74,222 @@ namespace GroteOPTOpdracht
             afstanden.Close();
 
 
+
+
+
+
+
+
+
             // run
-            //Console.WriteLine("Check");
 
-            float penalty = 640760.4f;
+            SimulatedAnnealing sa;
+            Parameters p = new Parameters(200, 5, 0.95f, 10000000, 10000, new int[4]{ 0, 1, 2, 4}, new int[3]{ 0, 1, 2});
             List<CollectionStop> ls = CreateObjectList();
+            sa = new SimulatedAnnealing(afstandenMatrix, ls, penalty, p);
 
-            SimulatedAnnealing sa = new SimulatedAnnealing(afstandenMatrix,
-                ls, penalty, 600, 20, 0.985f, 100000, 1000);
-            double score = sa.GetScore();
-            (double t, double pen) = sa.GetScoreDetailed();
-            sa.OutputSolution();
-            Console.WriteLine($"{score}");
-            Console.WriteLine($"time: {t}");
-            Console.WriteLine($"pen: {pen}");
+
+
+            // run paramatertuning
+            int minutes = 2;
+            TimeSpan timeLimit = TimeSpan.FromMinutes(minutes);
+
+
+            double score = 10000000;
+            int[] Tl = createRange(150, 900, 6);
+            int[] T_minl = createRange(1, 120, 6);
+            float[] t_factorl = createRange(0.80f, 0.99f, 6);
+            long[] iterationsl = createRangeLong(5000000, 500000000, 10);
+            long[] intervall = createRangeLong(10000, 1000000, 6);
+            int[] weightadd = createRange(1, 24, 6);
+            int[] weightremove = createRange(1, 4, 2);
+            int[] weightswap = createRange(1, 24, 6);
+            int[] weightshift = createRange(1, 30, 6);
+            int[] weightshift0 = createRange(1, 24, 6);
+            int[] weightshift1 = createRange(1, 20, 6);
+            int[] weightshift2 = createRange(1, 6, 6);
+            long it;
+            long itc;
+            int t;
+            int tm;
+            float tf;
+            int[] w;
+            int[] sw;
+
+
+
+            double scoreCheck;
+            Parameters bestP = new Parameters();
+
+
+            Stopwatch stopwatch = Stopwatch.StartNew();
+
+            while (stopwatch.Elapsed < timeLimit)
+            {
+                it = iterationsl[rnd.Next(iterationsl.Length)];
+                itc = intervall[rnd.Next(intervall.Length)];
+                t = Tl[rnd.Next(Tl.Length)];
+                tm = T_minl[rnd.Next(T_minl.Length)];
+                tf = t_factorl[rnd.Next(t_factorl.Length)];
+                if (it <= itc || t <= tm + 10) continue;
+                w = createWeightedList(weightswap[rnd.Next(weightswap.Length)], weightadd[rnd.Next(weightadd.Length)], weightremove[rnd.Next(weightremove.Length)], weightshift[rnd.Next(weightshift.Length)]);
+                sw = createShiftWeights(weightshift0[rnd.Next(weightshift0.Length)], weightshift1[rnd.Next(weightshift1.Length)], weightshift2[rnd.Next(weightshift2.Length)]);
+
+                p = new Parameters(t, tm, tf, it, itc, w, sw);
+
+                ls = CreateObjectList();
+                sa = new SimulatedAnnealing(afstandenMatrix, ls, penalty, p);
+
+                scoreCheck = sa.GetScore();
+                if (scoreCheck < score)
+                {
+                    bestP = p;
+                    score = scoreCheck;
+                    Console.WriteLine($"Found new best: {score} / {score/60}");
+                    sa.OutputSolution();
+                    (double ti, double pen) = sa.GetScoreDetailed();
+                    Console.WriteLine($"time: {ti}");
+                    Console.WriteLine($"penalty: {pen}");
+
+                }
+
+            }
+
+            stopwatch.Stop();
+            Console.WriteLine($"finished with score: {score} / {(score/60)}");
+            Console.WriteLine("best parameter combinations:");
+            DisplayParameters(bestP);
             return;
 
+        }
 
-
-
-
-            // optimize parameters
-            float[] Tlist = new float[3] { 46, 48, 50 };
-            float[] aList = new float[3] { 0.985f, 0.90f, 0.995f};
-            int[] TMinlist = new int[3] { 20, 40, 60};
-            int[] totalList = new int[3] { 80000000, 100000000, 120000000};
-            int iterationsTConstant = 100000;
-
-            int totalParameterCombinations = Tlist.Length * aList.Length * TMinlist.Length * totalList.Length;
-
-
-            float T = 0;
-            float a = 0;
-            int Tmin = 0;
-            int total = 0;
-
-            float aT = 0;
-            float aa = 0;
-            int aq = 0;
-            int atotal = 0;
-
-            int counter = 1;
-            double best = 99999;
-            double bestAverage = 99999;
-
-            for (int indexTotal = 0; indexTotal < totalList.Length; indexTotal++)
+        static int[] createWeightedList(int swap, int add, int remove, int shift)
+        {
+            int[] list = new int[(swap+add+remove+shift)];
+            for (int i = 0; i < list.Length; i++)
             {
-                Console.WriteLine($"Iterations: {totalList[indexTotal]}");
-
-
-                for (int indexA = 0; indexA < aList.Length; indexA++)
+                if (i < swap)
                 {
-                    for (int indexTMin = 0; indexTMin < TMinlist.Length; indexTMin++)
-                    {
-                        for (int indexT = 0; indexT < Tlist.Length; indexT++)
-                        {
-                            ls = CreateObjectList();
-
-                            Console.WriteLine($"{counter}/{totalParameterCombinations}; 1/3; ({indexTotal+1}/{totalList.Length})");
-                            SimulatedAnnealing s1 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
-                            double score1 = s1.GetScore();
-
-
-
-                            if (score1 < best)
-                            {
-                                best = score1;
-                                s1.OutputSolution();
-
-                                T = Tlist[indexT];
-                                a = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                total = totalList[indexTotal];
-                            }
-
-                            Console.WriteLine($"{counter}/{totalParameterCombinations}; 2/3; ({indexTotal + 1}/{totalList.Length})");
-
-
-                            ls = CreateObjectList();
-
-                            SimulatedAnnealing s2 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
-                            double score2 = s2.GetScore();
-
-
-                            if (score2 < best)
-                            {
-                                best = score2;
-                                s2.OutputSolution();
-
-                                T = Tlist[indexT];
-                                a = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                total = totalList[indexTotal];
-                            }
-
-                            Console.WriteLine($"{counter}/{totalParameterCombinations}: 3/3; ({indexTotal + 1}/{totalList.Length})");
-
-
-                            ls = CreateObjectList();
-                            SimulatedAnnealing s3 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
-                            double score3 = s3.GetScore();
-
-
-                            if (score3 < best)
-                            {
-                                best = score3;
-                                s3.OutputSolution();
-
-                                T = Tlist[indexT];
-                                a = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                total = totalList[indexTotal];
-                            }
-
-                            ls = CreateObjectList();
-                            SimulatedAnnealing s4 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
-                            double score4 = s4.GetScore();
-
-
-                            if (score4 < best)
-                            {
-                                best = score4;
-                                s4.OutputSolution();
-
-                                T = Tlist[indexT];
-                                a = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                total = totalList[indexTotal];
-                            }
-
-                            ls = CreateObjectList();
-                            SimulatedAnnealing s5 = new SimulatedAnnealing(afstandenMatrix,
-                                ls, penalty, Tlist[indexT], TMinlist[indexTMin], aList[indexA], totalList[indexTotal], iterationsTConstant);
-                            double score5 = s4.GetScore();
-
-
-                            if (score5 < best)
-                            {
-                                best = score5;
-                                s5.OutputSolution();
-
-                                T = Tlist[indexT];
-                                a = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                total = totalList[indexTotal];
-                            }
-
-
-                            if ((score1 + score2 + score3 + score4 + score5) / 5 < bestAverage)
-                            {
-                                bestAverage = (score1 + score2 + score3 + score4 + score5) / 5;
-                                aT = Tlist[indexT];
-                                aa = aList[indexA];
-                                Tmin = TMinlist[indexTMin];
-                                atotal = totalList[indexTotal];
-
-                            }
-
-
-                            counter++;
-
-                        }
-                    }
+                    list[i] = 0;
+                }
+                else if (i < (add + swap))
+                {
+                    list[i] = 1;
+                }
+                else if (i < (remove + add + swap))
+                {
+                    list[i] = 2;
+                }
+                else if (i < (shift+ remove + add + swap))
+                {
+                    list[i] = 3;
                 }
             }
 
-            Console.WriteLine($"Best Settings on Average: {bestAverage}");
-            Console.WriteLine($"starting T value: {aT}");
-            Console.WriteLine($"alpha value: {aa}");
-            Console.WriteLine($"iteration before alpha: {aq}");
-            Console.WriteLine($"iteration total: {atotal}\n");
-
-            Console.WriteLine($"Settings for best route: {best}");
-            Console.WriteLine($"starting T value: {T}");
-            Console.WriteLine($"alpha value: {a}");
-            //Console.WriteLine($"iteration before alpha: {q}");
-            Console.WriteLine($"iteration total: {total}");
-
-
+            return list;
         }
+
+        static int[] createShiftWeights(int truck, int day, int weak)
+        {
+            int[] list = new int[(truck + day + weak)];
+            for (int i = 0; i < list.Length; i++)
+            {
+                if (i < truck)
+                {
+                    list[i] = 0;
+                }
+                else if (i < (day + truck))
+                {
+                    list[i] = 1;
+                }
+                else if (i < (weak + truck + day))
+                {
+                    list[i] = 2;
+                }
+            }
+
+            return list;
+        }
+
+
+        static long[] createRangeLong(long start, long end, int freq)
+        {
+            long diff = end - start;
+            long[] range = new long[freq];
+            long steps = diff / (freq-1);
+            for (int i = 0; i < freq; i++)
+            {
+                range[i] = start;
+                start += steps;
+            }
+            return range;
+        }
+
+        static int[] createRange(int start, int end, int freq)
+        {
+            int diff = end - start;
+            int[] range = new int[freq];
+            int steps = diff / (freq - 1);
+            for (int i = 0; i < freq; i++)
+            {
+                range[i] = start;
+                start += steps;
+            }
+            return range;
+        }
+
+        static float[] createRange(float start, float end, int freq)
+        {
+            float diff = end - start;
+            float[] range = new float[freq];
+            float steps = diff / (freq - 1);
+            for (int i = 0; i < freq; i++)
+            {
+                range[i] = start;
+                start += steps;
+            }
+            return range;
+        }
+
+
+        static void DisplayParameters(Parameters p)
+        {
+
+            Console.WriteLine($"T: {p.T}");
+            Console.WriteLine($"T_min: {p.T_min}");
+            Console.WriteLine($"T_factor: {p.T_factor}");
+            Console.WriteLine($"iterations: {p.iterations}");
+            Console.WriteLine($"interval: {p.interval}");
+
+            int ws = 0;
+            int wa = 0;
+            int wr = 0;
+            int wsh = 0;
+
+            foreach (int i in p.weights)
+            {
+                if (i == 0) ws++;
+                if (i == 1) wa++;
+                if (i == 2) wr++;
+                if (i == 3) wsh++;
+            }
+
+            int s0 = 0;
+            int s1 = 0;
+            int s2 = 0;
+
+            foreach (int i in p.shiftWeights)
+            {
+                if (i == 0) s0++;
+                if (i == 1) s1++;
+                if (i == 2) s2++;
+            }
+
+
+            Console.WriteLine($"weights: {ws} (swap), {wa} (add), {wr} (remove), {wsh} (shift)");
+            Console.WriteLine($"weights: {s0} (truck), {s1} (day), {s2} (week)");
+        }
+
 
         static int ParseInt(string str, int start, int length)
         {

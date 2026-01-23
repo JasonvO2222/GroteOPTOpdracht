@@ -12,29 +12,35 @@ namespace GroteOPTOpdracht
 {
     public class SimulatedAnnealing
     {
-        private double T = 900; //chance variable
-        private double T_min = 20; // lowest value for T
-        private float a = 0.98f; //chance var factor 
-        private int Q = 100000; // iterations before factorizing
-        private long zLim = 5000000; // total iterations
-        private readonly int[,,] afstandenMatrix;
         private readonly List<CollectionStop> orderList;
         private Oplossing oplossing;
+        private readonly int[,,] afstandenMatrix;
+
         private static readonly Random rnd = new Random();
 
-        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, float chanceVar, float chanceVarMin, float chanceFactor, long totalIterations, int iterationsTConstant)
+        private double T; //chance variable
+        private double T_min; // lowest value for T
+        private float T_factor; //chance var factor 
+        private long interval; // iterations before factorizing
+        private long iterations; // total iterations
+        private int[] weights;
+        private int weightsLength;
+        private int[] shiftWeights;
+        private int shiftWeightsLength;
+
+        public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, Parameters p)
         {
-            if (totalIterations <= iterationsTConstant) {
-                Console.WriteLine("totalIterations cannot be less than (or equal to) iterationsTConstant");
-                return;
-            }
             afstandenMatrix = matrix;
             orderList = list;
-            T = chanceVar;
-            T_min = chanceVarMin;
-            a = chanceFactor;
-            zLim = totalIterations;
-            Q = (int)((totalIterations - iterationsTConstant) / (Math.Log(T_min / T, a)));
+            T = p.T;
+            T_min = p.T_min;
+            T_factor = p.T_factor;
+            iterations = p.iterations;
+            interval = p.interval;
+            weights = p.weights;
+            weightsLength = weights.Length;
+            shiftWeights = p.shiftWeights;
+            shiftWeightsLength = shiftWeights.Length;
 
 
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
@@ -44,7 +50,7 @@ namespace GroteOPTOpdracht
             // Either add/remove/swap/shift action
             // Need one index for remove and 2 for swap
 
-            long z = 1;
+            long iteration_counter = 1;
             bool TFlag = true;
             int action;
 
@@ -82,23 +88,24 @@ namespace GroteOPTOpdracht
 
 
 
-            while (z <= zLim)
+            while (iteration_counter <= iterations)
             {
 
-                if (z % Q == 0 && TFlag) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
+                if (TFlag && iteration_counter % interval == 0) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
-                    T = T * a;
-                    if (T < 20) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
+                    T = T * T_factor;
+                    if (T < T_min) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
                     {
                         TFlag = false;
-                        T = 20;
+                        T = T_min;
                     }
                 }
 
 
 
 
-                action = rnd.Next(4);
+                action = rnd.Next(weightsLength);
+                action = weights[action];
                 if (action == 0) // swap
                 {
                     //continue;
@@ -236,11 +243,8 @@ namespace GroteOPTOpdracht
 
                 else if (action == 3) // shift
                 {
-                    shiftMode = rnd.Next(3); // 0 means within ride, 1 means within day, 2 means within week
-                    if (shiftMode != 2)
-                    {
-                        continue;
-                    }
+                    shiftMode = rnd.Next(shiftWeightsLength); // 0 means within ride, 1 means within day, 2 means within week
+                    shiftMode = shiftWeights[shiftMode];
                     sourceDay = rnd.Next(5);
                     sourceTruck = rnd.Next(2);
                     sourceList = oplossing.MappingToList(sourceDay, sourceTruck);
@@ -285,7 +289,7 @@ namespace GroteOPTOpdracht
                     }
                 }
 
-                z++;
+                iteration_counter++;
             }
 
 
