@@ -23,6 +23,7 @@ namespace GroteOPTOpdracht
         private float T_factor; //chance var factor 
         private long interval; // iterations before factorizing
         private long iterations; // total iterations
+        private long iterationsTConstant;
         private int[] weights;
         private int weightsLength;
         private int[] shiftWeights;
@@ -36,11 +37,20 @@ namespace GroteOPTOpdracht
             T_min = p.T_min;
             T_factor = p.T_factor;
             iterations = p.iterations;
-            interval = p.interval;
+            iterationsTConstant = p.iterationsTConstant;
             weights = p.weights;
             weightsLength = weights.Length;
             shiftWeights = p.shiftWeights;
             shiftWeightsLength = shiftWeights.Length;
+
+
+            if (iterations <= iterationsTConstant)
+            {
+                Console.WriteLine("totalIterations cannot be less than (or equal to) iterationsTConstant");
+                return;
+            }
+
+            interval = (int)((iterations - iterationsTConstant) / (Math.Log(T_min / T, T_factor)));
 
 
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
@@ -274,7 +284,7 @@ namespace GroteOPTOpdracht
 
                             oplossing.tijd += sourceTimeDiff + targetTimeDiff;
                             oplossing.Shift(source, target);
-                            if (HasCircularReference(source))
+                            if (HasCircularReference(source)) // nog weghalen
                             {
                                 Console.WriteLine($"Circular ref created! source: {source.matrixId}, target: {target.matrixId}");
                                 Console.WriteLine($"source.prev: {source.prev?.matrixId}, source.next: {source.next?.matrixId}");
@@ -306,7 +316,7 @@ namespace GroteOPTOpdracht
 
         }
 
-        private bool HasCircularReference(Stop start, int maxNodes = 10000)
+        private bool HasCircularReference(Stop start, int maxNodes = 10000) // nog weghalen
         {
             HashSet<Stop> visited = new HashSet<Stop>();
             Stop current = start;
@@ -345,7 +355,6 @@ namespace GroteOPTOpdracht
                 targetDay = source.dayStop.day;
                 targetTruck = rnd.Next(2);
                 targetList = (shiftMode == 0) ? sourceList : oplossing.MappingToList(source.dayStop.day, targetTruck);
-                targetList = sourceList;
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
@@ -354,7 +363,7 @@ namespace GroteOPTOpdracht
                 else
                 {
                     target = targetList[(int)targetIndex];
-                    if (target == source) return false;
+                    if (target == source || target.next == source) return false;
                 }
 
 
@@ -369,6 +378,10 @@ namespace GroteOPTOpdracht
                 timeDiff = sourceTimeDiff + targetTimeDiff;
 
                 if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
+                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
                 {
                     return false;
                 }
@@ -402,6 +415,10 @@ namespace GroteOPTOpdracht
                 timeDiff = sourceTimeDiff + targetTimeDiff;
 
                 if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
+                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
                 {
                     return false;
                 }
@@ -443,22 +460,28 @@ namespace GroteOPTOpdracht
                 {
                     return false;
                 }
+                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
+                {
+                    return false;
+                }
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
-            else if (source.frequency != 2)
+            else if (source.frequency == 2)
             {
+                CollectionStop temp;
                 sourceDay = source.dayStop.day;
                 int[] mapping = (sourceDay % 3 == 0) ? new int[2] { 1, 4 } : new int[2] { 0, 3 };
                 timeDiff = 0;
 
                 for (int i = 0; i < 2; i++)
                 {
-                    source = (i == 0) ? source : source.siblings[0];
+                    temp = (i == 0) ? source : source.siblings[0];
                     targetDay = mapping[i];
                     targetTruck = rnd.Next(2);
                     targetList = oplossing.MappingToList(targetDay, targetTruck);
                     targetIndex = oplossing.pickRandomStop(targetList);
+                    sourceList = oplossing.MappingToList(temp.dayStop.day, temp.dayStop.truckId);
                     if (targetIndex == null)
                     {
                         target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
@@ -466,25 +489,29 @@ namespace GroteOPTOpdracht
                     else
                     {
                         target = targetList[(int)targetIndex];
-                        if (target == source) return false;
+                        if (target == temp || target.next == temp) return false;
                     }
 
-                    sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
-                    - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
-                    - afstandenMatrix[source.matrixId, source.next.matrixId, 1]
-                    - source.loadingTime;
-                    targetTimeDiff = afstandenMatrix[target.matrixId, source.matrixId, 1]
-                        + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
+                    sourceTimeDiff = afstandenMatrix[temp.prev.matrixId, temp.next.matrixId, 1]
+                    - afstandenMatrix[temp.prev.matrixId, temp.matrixId, 1]
+                    - afstandenMatrix[temp.matrixId, temp.next.matrixId, 1]
+                    - temp.loadingTime;
+                    targetTimeDiff = afstandenMatrix[target.matrixId, temp.matrixId, 1]
+                        + afstandenMatrix[temp.matrixId, target.next.matrixId, 1]
                         - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
-                        + source.loadingTime;
+                        + temp.loadingTime;
                     timeDiff += sourceTimeDiff + targetTimeDiff;
 
                     if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
                     {
                         return false;
                     }
+                    if (temp.containerVolume * temp.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
+                    {
+                        return false;
+                    }
 
-                    stopsToShift[i] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
+                    stopsToShift[i] = (temp, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
                 }
             }
             else // cant switch between days if freq -- 3

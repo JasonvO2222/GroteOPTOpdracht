@@ -15,17 +15,17 @@ namespace GroteOPTOpdracht
         public int T_min;
         public float T_factor;
         public long iterations;
-        public long interval;
+        public long iterationsTConstant;
         public int[] weights;
         public int[] shiftWeights;
 
-        public Parameters(int T, int T_min, float T_factor, long iterations, long interval, int[] weights, int[] shiftWeights)
+        public Parameters(int T, int T_min, float T_factor, long iterations, long iterationsTConstant, int[] weights, int[] shiftWeights)
         {
             this.T = T;
             this.T_min = T_min;
             this.T_factor = T_factor;
             this.iterations = iterations;
-            this.interval = interval;
+            this.iterationsTConstant = iterationsTConstant;
             this.weights = weights;
             this.shiftWeights = shiftWeights;
         } 
@@ -91,16 +91,16 @@ namespace GroteOPTOpdracht
 
 
             // run paramatertuning
-            int minutes = 2;
+            int minutes = 360;
             TimeSpan timeLimit = TimeSpan.FromMinutes(minutes);
 
 
             double score = 10000000;
-            int[] Tl = createRange(150, 900, 6);
-            int[] T_minl = createRange(1, 120, 6);
+            int[] Tl = createRange(120, 1200, 6);
+            int[] T_minl = createRange(1, 150, 6);
             float[] t_factorl = createRange(0.80f, 0.99f, 6);
-            long[] iterationsl = createRangeLong(5000000, 500000000, 10);
-            long[] intervall = createRangeLong(10000, 1000000, 6);
+            long[] iterationsl = new long[6] { 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000 };//createRangeLong(5000000, 500000000, 10);
+            long[] iterationsTConstantl = createRangeLong(10000, 50000000, 6);
             int[] weightadd = createRange(1, 24, 6);
             int[] weightremove = createRange(1, 4, 2);
             int[] weightswap = createRange(1, 24, 6);
@@ -127,11 +127,11 @@ namespace GroteOPTOpdracht
             while (stopwatch.Elapsed < timeLimit)
             {
                 it = iterationsl[rnd.Next(iterationsl.Length)];
-                itc = intervall[rnd.Next(intervall.Length)];
+                itc = iterationsTConstantl[rnd.Next(iterationsTConstantl.Length)];
                 t = Tl[rnd.Next(Tl.Length)];
                 tm = T_minl[rnd.Next(T_minl.Length)];
                 tf = t_factorl[rnd.Next(t_factorl.Length)];
-                if (it <= itc || t <= tm + 10) continue;
+                if (it <= itc*2 || t <= tm + 10) continue;
                 w = createWeightedList(weightswap[rnd.Next(weightswap.Length)], weightadd[rnd.Next(weightadd.Length)], weightremove[rnd.Next(weightremove.Length)], weightshift[rnd.Next(weightshift.Length)]);
                 sw = createShiftWeights(weightshift0[rnd.Next(weightshift0.Length)], weightshift1[rnd.Next(weightshift1.Length)], weightshift2[rnd.Next(weightshift2.Length)]);
 
@@ -145,9 +145,9 @@ namespace GroteOPTOpdracht
                 {
                     bestP = p;
                     score = scoreCheck;
-                    Console.WriteLine($"Found new best: {score} / {score/60}");
                     sa.OutputSolution();
                     (double ti, double pen) = sa.GetScoreDetailed();
+                    Console.WriteLine($"Found new best: {score} / {score / 60}");
                     Console.WriteLine($"time: {ti}");
                     Console.WriteLine($"penalty: {pen}");
 
@@ -259,7 +259,7 @@ namespace GroteOPTOpdracht
             Console.WriteLine($"T_min: {p.T_min}");
             Console.WriteLine($"T_factor: {p.T_factor}");
             Console.WriteLine($"iterations: {p.iterations}");
-            Console.WriteLine($"interval: {p.interval}");
+            Console.WriteLine($"iterationsTConstant: {p.iterationsTConstant}");
 
             int ws = 0;
             int wa = 0;
