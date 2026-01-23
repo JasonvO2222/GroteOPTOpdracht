@@ -93,6 +93,9 @@ namespace GroteOPTOpdracht
                 o.next = dayStops[i];
                 dayStops[i].prev = o;
 
+                dayStops[l].dayStop = dayStops[i];
+                dayStops[l].ofloadStop = o;
+
                 dayStops[i].dayTime += 1800;
                 tijd += 1800;
             }
@@ -214,15 +217,6 @@ namespace GroteOPTOpdracht
 
             }
 
-            // debug 
-            foreach (var v in monday0.Concat(monday1.Concat(tuesday0.Concat(tuesday1.Concat(wednesday0.Concat(wednesday1.Concat(thursday0.Concat(thursday1.Concat(friday0.Concat(friday1)))))))))) {
-
-                Console.WriteLine(v.index);
-            }
-
-            foreach (var v in ignore) {
-                Console.WriteLine(v.index);
-            }
         }
 
         // Checks if all stops in the input (from one order) will fit in the randomly chosen days/trucks
@@ -494,7 +488,7 @@ namespace GroteOPTOpdracht
         }
 
         // inserts a node into the linkedlist at specific node
-        public void Insert(CollectionStop insertNode, CollectionStop newStop)
+        public void Insert(Stop insertNode, CollectionStop newStop)
         {
             newStop.next = insertNode.next;
             insertNode.next.prev = newStop;
@@ -518,8 +512,13 @@ namespace GroteOPTOpdracht
         }
 
         // shift two nodes in the linkedList
-        public void Shift(CollectionStop source,  CollectionStop target)
+        public void Shift(CollectionStop source,  Stop target)
         {
+            if (target.next == source)
+            {
+                return;
+            }
+
             source.prev.next = source.next;
             source.next.prev = source.prev;
             source.prev = target;

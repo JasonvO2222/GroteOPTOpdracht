@@ -35,7 +35,6 @@ namespace GroteOPTOpdracht
             a = chanceFactor;
             zLim = totalIterations;
             Q = (int)((totalIterations - iterationsTConstant) / (Math.Log(T_min / T, a)));
-            Console.WriteLine(Q);
 
 
             oplossing = new Oplossing(orderList, afstandenMatrix, penalty);
@@ -56,7 +55,8 @@ namespace GroteOPTOpdracht
             int sourceTruck;
             float sourceTimeDiff;
             int sourceVolumeDiff;
-            CollectionStop target;
+            Stop target;
+            CollectionStop cTarget;
             List<CollectionStop> targetList;
             int? targetIndex;
             int targetDay;
@@ -68,6 +68,19 @@ namespace GroteOPTOpdracht
 
             int shiftMode;
             int freq;
+
+            //debug trackers
+            float timeDiffAdd = 0;
+            float penaltyDiffAdd = 0;
+            float timeDiffRemove = 0;
+            float penaltyDiffRemove = 0;
+            float timeDiffSwap = 0;
+            float timeDiffShift = 0;
+
+
+
+
+
 
             while (z <= zLim)
             {
@@ -88,7 +101,7 @@ namespace GroteOPTOpdracht
                 action = rnd.Next(4);
                 if (action == 0) // swap
                 {
-                    Console.WriteLine("Swap");
+                    //continue;
                     sourceDay = rnd.Next(5);
 
                     sourceList = oplossing.MappingToList(sourceDay, rnd.Next(2));
@@ -131,33 +144,34 @@ namespace GroteOPTOpdracht
                         continue;
                     }
 
-                    target = targetList[(int)targetIndex];
+                    cTarget = targetList[(int)targetIndex];
 
-                    if (targetDay != sourceDay && target.frequency > 1)
+                    if (targetDay != sourceDay && cTarget.frequency > 1)
                     {
                         continue;
                     }
 
 
 
-                    if (ConsiderSwap(source, target, out sourceTimeDiff, out targetTimeDiff, out timeDiff, out sourceVolumeDiff, out targetVolumeDiff))
+                    if (ConsiderSwap(source, cTarget, out sourceTimeDiff, out targetTimeDiff, out timeDiff, out sourceVolumeDiff, out targetVolumeDiff))
                     {
                         source.dayStop.dayTime += sourceTimeDiff;
-                        target.dayStop.dayTime += targetTimeDiff;
+                        cTarget.dayStop.dayTime += targetTimeDiff;
                         source.ofloadStop.volume += sourceVolumeDiff;
-                        target.ofloadStop.volume += targetVolumeDiff;
+                        cTarget.ofloadStop.volume += targetVolumeDiff;
 
                         oplossing.tijd += timeDiff;
-                        oplossing.Swap(source, target);
-                        oplossing.SwapStop(source, sourceList, target, targetList);
+                        oplossing.Swap(source, cTarget);
+                        oplossing.SwapStop(source, sourceList, cTarget, targetList);
+
+                        timeDiffSwap += timeDiff;
                     }
 
                 }
 
                 else if (action == 1) // add
                 {
-                    Console.WriteLine("add");
-
+                    //continue;
                     sourceIndex = oplossing.pickRandomIgnoredStop();
                     sourceList = oplossing.ignore;
 
@@ -169,7 +183,7 @@ namespace GroteOPTOpdracht
                     source = sourceList[(int)sourceIndex];
 
                     //stop to add, stop where isnert, timeDiff, list where to add
-                    if (ConsiderAdd(source, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out penaltyDiff))
+                    if (ConsiderAdd(source, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out penaltyDiff))
                     {
                         foreach (var v in stopsToAdd)
                         {
@@ -179,16 +193,17 @@ namespace GroteOPTOpdracht
                             oplossing.tijd += timeDiff;
                             oplossing.Insert(target, source);
                             oplossing.AddStop(source, targetList);
+                            timeDiffAdd += timeDiff;
                         }
                         oplossing.penalty += penaltyDiff;
+                        penaltyDiffAdd += penaltyDiff;
                     }
 
                 }
 
                 else if (action == 2) // remove
                 {
-                    Console.WriteLine("Remove");
-
+                    //continue;
                     sourceList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
                     sourceIndex = oplossing.pickRandomStop(sourceList);
 
@@ -211,14 +226,21 @@ namespace GroteOPTOpdracht
                             oplossing.Remove(source);
                             oplossing.RemoveStop(source, sourceList);
 
+
+                            timeDiffRemove += timeDiff;
                         }
                         oplossing.penalty += penaltyDiff;
+                        penaltyDiffRemove += penaltyDiff;
                     }
                 }
 
                 else if (action == 3) // shift
                 {
                     shiftMode = rnd.Next(3); // 0 means within ride, 1 means within day, 2 means within week
+                    if (shiftMode != 2)
+                    {
+                        continue;
+                    }
                     sourceDay = rnd.Next(5);
                     sourceTruck = rnd.Next(2);
                     sourceList = oplossing.MappingToList(sourceDay, sourceTruck);
@@ -229,24 +251,35 @@ namespace GroteOPTOpdracht
                     }
 
                     source = sourceList[(int)sourceIndex];
-                    freq = (shiftMode < 2) ? 1 : source.frequency;
+                    freq = (shiftMode == 2 && source.frequency == 2) ? 2 : 1;
 
 
 
-                    if (ConsiderShift(source, sourceList, shiftMode, out (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[] stopsToShift))
+                    if (ConsiderShift(source, sourceList, shiftMode, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift))
                     {
                         for (int i = 0; i < freq; i++)
                         {
                             (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff) = stopsToShift[i];
 
+                            if (target.next == source) continue;
+
                             source.dayStop.dayTime += sourceTimeDiff;
                             target.dayStop.dayTime += targetTimeDiff;
                             source.ofloadStop.volume -= (source.containerCount * source.containerVolume);
-                            source.ofloadStop.volume -= (source.containerCount * source.containerVolume);
+                            target.ofloadStop.volume += (source.containerCount * source.containerVolume);
 
-                            oplossing.tijd += sourceTimeDiff = targetTimeDiff;
+                            oplossing.tijd += sourceTimeDiff + targetTimeDiff;
                             oplossing.Shift(source, target);
+                            if (HasCircularReference(source))
+                            {
+                                Console.WriteLine($"Circular ref created! source: {source.matrixId}, target: {target.matrixId}");
+                                Console.WriteLine($"source.prev: {source.prev?.matrixId}, source.next: {source.next?.matrixId}");
+                                Console.WriteLine($"Shift mode: {shiftMode}, freq: {freq}, iteration: {i}");
+                                throw new Exception("Circular reference detected");
+                            }
                             oplossing.ShiftStop(source, sourceList, targetList);
+
+                            timeDiffShift += sourceTimeDiff + targetTimeDiff;
 
                         }
                     }
@@ -256,33 +289,70 @@ namespace GroteOPTOpdracht
             }
 
 
+
+
+            Console.WriteLine($"timeDiffAdd: {timeDiffAdd}");
+            Console.WriteLine($"penaltyDiffAdd: {penaltyDiffAdd}");
+            Console.WriteLine($"timeDiffRemove: {timeDiffRemove}");
+            Console.WriteLine($"penaltyDiffRemove: {penaltyDiffRemove}");
+            Console.WriteLine($"timeDiffSwap: {timeDiffSwap}");
+            Console.WriteLine($"timeDiffShift: {timeDiffShift}");
+
+
+
         }
 
-        private bool ConsiderShift(CollectionStop source, List<CollectionStop> sourceList, int shiftMode, out (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[] stopsToShift)
+        private bool HasCircularReference(Stop start, int maxNodes = 10000)
         {
-            CollectionStop target;
+            HashSet<Stop> visited = new HashSet<Stop>();
+            Stop current = start;
+
+            while (current != null && visited.Count < maxNodes)
+            {
+                if (!visited.Add(current))
+                {
+                    // Found a cycle
+                    Console.WriteLine($"Circular reference detected at stop: {current}");
+                    return true;
+                }
+                current = current.next;
+            }
+
+            return false;
+        }
+
+        private bool ConsiderShift(CollectionStop source, List<CollectionStop> sourceList, int shiftMode, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift)
+        {
+            Stop target;
             List<CollectionStop> targetList;
             int? targetIndex;
             int sourceDay;
             int targetDay;
+            int targetTruck;
             float timeDiff;
             float sourceTimeDiff;
             float targetTimeDiff;
 
-            stopsToShift = new (CollectionStop, List<CollectionStop>, CollectionStop, List<CollectionStop>, float, float)[source.frequency];
+            stopsToShift = new (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[source.frequency];
 
 
             if (shiftMode < 2)
             {
-                targetList = (shiftMode == 0) ? sourceList : oplossing.MappingToList(source.dayStop.day, rnd.Next(2));
+                targetDay = source.dayStop.day;
+                targetTruck = rnd.Next(2);
+                targetList = (shiftMode == 0) ? sourceList : oplossing.MappingToList(source.dayStop.day, targetTruck);
                 targetList = sourceList;
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
+                }
+                else
+                {
+                    target = targetList[(int)targetIndex];
+                    if (target == source) return false;
                 }
 
-                target = targetList[(int)targetIndex];
 
                 sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
                     - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
@@ -293,19 +363,29 @@ namespace GroteOPTOpdracht
                     - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
+
+                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
             else if (source.frequency == 1)
             {
-                targetList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
+                targetDay = rnd.Next(5);
+                targetTruck = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, targetTruck);
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
                 }
-
-                target = targetList[(int)targetIndex];
+                else
+                {
+                    target = targetList[(int)targetIndex];
+                    if (target == source) return false;
+                }
 
                 sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
                     - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
@@ -316,6 +396,11 @@ namespace GroteOPTOpdracht
                     - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
+
+                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
@@ -326,14 +411,19 @@ namespace GroteOPTOpdracht
                 {
                     targetDay -= s.dayStop.day;
                 }
-                targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                targetTruck = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, targetTruck);
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
+                }
+                else
+                {
+                    target = targetList[(int)targetIndex];
+                    if (target == source) return false;
                 }
 
-                target = targetList[(int)targetIndex];
 
                 sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
                     - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
@@ -344,6 +434,11 @@ namespace GroteOPTOpdracht
                     - afstandenMatrix[target.matrixId, target.next.matrixId, 1]
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
+
+                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                {
+                    return false;
+                }
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
@@ -356,15 +451,19 @@ namespace GroteOPTOpdracht
                 for (int i = 0; i < 2; i++)
                 {
                     source = (i == 0) ? source : source.siblings[0];
-
-                    targetList = oplossing.MappingToList(mapping[i], rnd.Next(2));
+                    targetDay = mapping[i];
+                    targetTruck = rnd.Next(2);
+                    targetList = oplossing.MappingToList(targetDay, targetTruck);
                     targetIndex = oplossing.pickRandomStop(targetList);
                     if (targetIndex == null)
                     {
-                        return false;
+                        target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
                     }
-
-                    target = targetList[(int)targetIndex];
+                    else
+                    {
+                        target = targetList[(int)targetIndex];
+                        if (target == source) return false;
+                    }
 
                     sourceTimeDiff = afstandenMatrix[source.prev.matrixId, source.next.matrixId, 1]
                     - afstandenMatrix[source.prev.matrixId, source.matrixId, 1]
@@ -376,6 +475,11 @@ namespace GroteOPTOpdracht
                         + source.loadingTime;
                     timeDiff += sourceTimeDiff + targetTimeDiff;
 
+                    if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
+                    {
+                        return false;
+                    }
+
                     stopsToShift[i] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
                 }
             }
@@ -383,7 +487,6 @@ namespace GroteOPTOpdracht
             {
                 return false;
             }
-
 
             if (timeDiff <= 0) // if the change is an improvement follow through
             {
@@ -436,14 +539,15 @@ namespace GroteOPTOpdracht
         }
 
 
-        private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, CollectionStop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff)
+        private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff)
         {
             List<CollectionStop> targetList;
             CollectionStop source;
-            CollectionStop target;
+            Stop target;
             int? targetIndex;
             int targetDay;
-            stopsToAdd = new (CollectionStop, CollectionStop, float, List<CollectionStop>)[newStop.frequency];
+            int targetTruck;
+            stopsToAdd = new (CollectionStop, Stop, float, List<CollectionStop>)[newStop.frequency];
 
             float timeDiff;
             float totalTimeDiff = 0;
@@ -453,38 +557,52 @@ namespace GroteOPTOpdracht
             // find targets (destinations) for each stop in order that will be added
             if (newStop.frequency == 1)
             {
-                targetList = oplossing.MappingToList(rnd.Next(5), rnd.Next(2));
+                targetDay = rnd.Next(5);
+                targetTruck = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, targetTruck);
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay-1, targetTruck);
+                }
+                else
+                {
+                    target = targetList[(int)targetIndex];
                 }
 
-                target = targetList[(int)targetIndex];
                 stopsToAdd[0] = (newStop, target, 0f, targetList);
             }
             else if (newStop.frequency == 2)
             {
                 targetDay = rnd.Next(2);
-                targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                targetTruck = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, targetTruck);
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay - 1, targetTruck);
+                }
+                else
+                {
+                    target = targetList[(int)targetIndex];
                 }
 
-                target = targetList[(int)targetIndex];
+
                 stopsToAdd[0] = (newStop, target, 0f, targetList);
 
                 source = newStop.siblings[0];
-                targetList = oplossing.MappingToList((targetDay + 3), rnd.Next(2));
+                targetDay += 3;
+                targetTruck = rnd.Next(2);
+                targetList = oplossing.MappingToList(targetDay, targetTruck);
                 targetIndex = oplossing.pickRandomStop(targetList);
                 if (targetIndex == null)
                 {
-                    return false;
+                    target = oplossing.MappingToDayStop(targetDay - 1, targetTruck);
                 }
-
-                target = targetList[(int)targetIndex];
+                else
+                {
+                    target = targetList[(int)targetIndex];
+                }
 
                 stopsToAdd[1] = (source, target, 0f, targetList);
             }
@@ -494,14 +612,17 @@ namespace GroteOPTOpdracht
                 foreach (CollectionStop cStop in newStop.siblings.Append(newStop))
                 {
                     targetDay = c * 2;
-                    targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                    targetTruck = rnd.Next(2);
+                    targetList = oplossing.MappingToList(targetDay, targetTruck);
                     targetIndex = oplossing.pickRandomStop(targetList);
                     if (targetIndex == null)
                     {
-                        return false;
+                        target = oplossing.MappingToDayStop(targetDay - 1, targetTruck);
                     }
-
-                    target = targetList[(int)targetIndex];
+                    else
+                    {
+                        target = targetList[(int)targetIndex];
+                    }
 
                     stopsToAdd[c] = (cStop, target, 0f, targetList);
                     c += 1;
@@ -516,15 +637,17 @@ namespace GroteOPTOpdracht
                 foreach (CollectionStop cStop in newStop.siblings.Append(newStop))
                 {
                     if (targetDay == r) targetDay++;
-
-                    targetList = oplossing.MappingToList(targetDay, rnd.Next(2));
+                    targetTruck = rnd.Next(2);
+                    targetList = oplossing.MappingToList(targetDay, targetTruck);
                     targetIndex = oplossing.pickRandomStop(targetList);
                     if (targetIndex == null)
                     {
-                        return false;
+                        target = oplossing.MappingToDayStop(targetDay - 1, targetTruck);
                     }
-
-                    target = targetList[(int)targetIndex];
+                    else
+                    {
+                        target = targetList[(int)targetIndex];
+                    }
 
                     stopsToAdd[c] = (cStop, target, 0f, targetList);
                     c++;

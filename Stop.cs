@@ -12,6 +12,8 @@ namespace GroteOPTOpdracht
         public Stop? next;
         public Stop? prev;
         public int matrixId;
+        public DayStop? dayStop; // track which day the stop is on
+        public OfloadStop? ofloadStop; // track at which ofload stop node/moment the trash picked upo will be dumped
 
         public Stop(int MId) {
             this.matrixId = MId;
@@ -47,8 +49,6 @@ namespace GroteOPTOpdracht
     {
 
         public CollectionStop[] siblings; // if order with freq > 1 track order node copies (siblings)
-        public DayStop? dayStop; // track which day the stop is on
-        public OfloadStop? ofloadStop; // track at which ofload stop node/moment the trash picked upo will be dumped
 
         public bool included; // bool to quicly check if node is included in solution
         public int orderId { get; set; }

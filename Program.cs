@@ -45,7 +45,7 @@ namespace GroteOPTOpdracht
 
 
             // run
-            Console.WriteLine("Check");
+            //Console.WriteLine("Check");
 
             float penalty = 640760.4f;
             List<CollectionStop> ls = CreateObjectList();
