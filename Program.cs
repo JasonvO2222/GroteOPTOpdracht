@@ -18,8 +18,11 @@ namespace GroteOPTOpdracht
         public long iterationsTConstant;
         public int[] weights;
         public int[] shiftWeights;
+        public float volumePenalty;
+        public float timePenalty;
+        public float multiplier;
 
-        public Parameters(int T, int T_min, float T_factor, long iterations, long iterationsTConstant, int[] weights, int[] shiftWeights)
+        public Parameters(int T, int T_min, float T_factor, long iterations, long iterationsTConstant, int[] weights, int[] shiftWeights, float volumePenalty, float timePenalty, float multiplier)
         {
             this.T = T;
             this.T_min = T_min;
@@ -28,6 +31,9 @@ namespace GroteOPTOpdracht
             this.iterationsTConstant = iterationsTConstant;
             this.weights = weights;
             this.shiftWeights = shiftWeights;
+            this.volumePenalty = volumePenalty;
+            this.timePenalty = timePenalty;
+            this.multiplier = multiplier;
         } 
     }
 
@@ -82,32 +88,48 @@ namespace GroteOPTOpdracht
 
 
             // run
-
+            bool b;
+            string s;
+            double score = 1000000;
+            double scoreCheck;
             SimulatedAnnealing sa;
-            Parameters p = new Parameters(200, 5, 0.95f, 10000000, 10000, new int[4]{ 0, 1, 2, 4}, new int[3]{ 0, 1, 2});
+            Parameters p = new Parameters(770, 1, 0.915f, 50000000, 1000000, createWeightedList(8, 9, 2, 26), createShiftWeights(8, 2, 4), 5, 5, 1.2f);
             List<CollectionStop> ls = CreateObjectList();
             sa = new SimulatedAnnealing(afstandenMatrix, ls, penalty, p);
-
+            scoreCheck = sa.GetScore();
+            (double ti, double pen) = sa.GetScoreDetailed();
+            b = sa.Check();
+            s = (b) ? "CORRECT" : "invalid";
+            if (b)
+            {
+                score = scoreCheck;
+                sa.OutputSolution();
+            }
+            Console.WriteLine($"Found {s} solution: {scoreCheck} / {scoreCheck / 60}");
+            Console.WriteLine($"time: {ti}");
+            Console.WriteLine($"penalty: {pen}");
+            DisplayParameters(p);
 
 
             // run paramatertuning
-            int minutes = 360;
+            int minutes = 90;
             TimeSpan timeLimit = TimeSpan.FromMinutes(minutes);
 
-
-            double score = 10000000;
-            int[] Tl = createRange(120, 1200, 6);
-            int[] T_minl = createRange(1, 150, 6);
-            float[] t_factorl = createRange(0.80f, 0.99f, 6);
-            long[] iterationsl = new long[6] { 5000000, 10000000, 50000000, 100000000, 500000000, 1000000000 };//createRangeLong(5000000, 500000000, 10);
-            long[] iterationsTConstantl = createRangeLong(10000, 50000000, 6);
-            int[] weightadd = createRange(1, 24, 6);
-            int[] weightremove = createRange(1, 4, 2);
-            int[] weightswap = createRange(1, 24, 6);
-            int[] weightshift = createRange(1, 30, 6);
-            int[] weightshift0 = createRange(1, 24, 6);
-            int[] weightshift1 = createRange(1, 20, 6);
-            int[] weightshift2 = createRange(1, 6, 6);
+            int[] Tl = createRange(450, 1050, 6);
+            int[] T_minl = createRange(1, 11, 6);
+            float[] t_factorl = createRange(0.87f, 0.97f, 6);
+            long[] iterationsl = new long[5] { 25000000, 50000000, 100000000, 500000000, 1000000000 };//createRangeLong(5000000, 500000000, 10);
+            long[] iterationsTConstantl = new long[5] { 10000, 100000, 1000000, 50000000, 500000000 };
+            int[] weightadd = createRange(6, 16, 6);
+            int[] weightremove = createRange(6, 16, 6);
+            int[] weightswap = createRange(6, 16, 6);
+            int[] weightshift = createRange(21, 31, 6);
+            int[] weightshift0 = createRange(5, 25, 6);
+            int[] weightshift1 = createRange(1, 21, 6);
+            int[] weightshift2 = createRange(1, 21, 6);
+            float[] volumePenaltyl = createRange(3f, 60f, 10);
+            float[] timePenaltyl = createRange(3f, 30f, 10);
+            float[] multiplierl = createRange(1.005f, 3.2f, 11);
             long it;
             long itc;
             int t;
@@ -118,7 +140,6 @@ namespace GroteOPTOpdracht
 
 
 
-            double scoreCheck;
             Parameters bestP = new Parameters();
 
 
@@ -126,16 +147,16 @@ namespace GroteOPTOpdracht
 
             while (stopwatch.Elapsed < timeLimit)
             {
-                it = iterationsl[rnd.Next(iterationsl.Length)];
                 itc = iterationsTConstantl[rnd.Next(iterationsTConstantl.Length)];
+                it = itc + iterationsl[rnd.Next(iterationsl.Length)];
                 t = Tl[rnd.Next(Tl.Length)];
                 tm = T_minl[rnd.Next(T_minl.Length)];
                 tf = t_factorl[rnd.Next(t_factorl.Length)];
-                if (it <= itc*2 || t <= tm + 10) continue;
+                if (t <= tm + 10) continue;
                 w = createWeightedList(weightswap[rnd.Next(weightswap.Length)], weightadd[rnd.Next(weightadd.Length)], weightremove[rnd.Next(weightremove.Length)], weightshift[rnd.Next(weightshift.Length)]);
                 sw = createShiftWeights(weightshift0[rnd.Next(weightshift0.Length)], weightshift1[rnd.Next(weightshift1.Length)], weightshift2[rnd.Next(weightshift2.Length)]);
 
-                p = new Parameters(t, tm, tf, it, itc, w, sw);
+                p = new Parameters(t, tm, tf, it, itc, w, sw, volumePenaltyl[rnd.Next(volumePenaltyl.Length)], timePenaltyl[rnd.Next(timePenaltyl.Length)], multiplierl[rnd.Next(multiplierl.Length)]);
 
                 ls = CreateObjectList();
                 sa = new SimulatedAnnealing(afstandenMatrix, ls, penalty, p);
@@ -143,13 +164,19 @@ namespace GroteOPTOpdracht
                 scoreCheck = sa.GetScore();
                 if (scoreCheck < score)
                 {
-                    bestP = p;
-                    score = scoreCheck;
-                    sa.OutputSolution();
-                    (double ti, double pen) = sa.GetScoreDetailed();
-                    Console.WriteLine($"Found new best: {score} / {score / 60}");
+                    b = sa.Check();
+                    if (b)
+                    {
+                        score = scoreCheck;
+                        bestP = p;
+                        sa.OutputSolution();
+                    }
+                    s = (b) ? "CORRECT" : "invalid";
+                    Console.WriteLine($"Found new {s} best: {scoreCheck} / {scoreCheck / 60}");
+                    (ti, pen) = sa.GetScoreDetailed();
                     Console.WriteLine($"time: {ti}");
                     Console.WriteLine($"penalty: {pen}");
+                    DisplayParameters(p);
 
                 }
 
@@ -288,6 +315,9 @@ namespace GroteOPTOpdracht
 
             Console.WriteLine($"weights: {ws} (swap), {wa} (add), {wr} (remove), {wsh} (shift)");
             Console.WriteLine($"weights: {s0} (truck), {s1} (day), {s2} (week)");
+            Console.WriteLine($"volumePenalty: {p.volumePenalty}");
+            Console.WriteLine($"timePenalty: {p.timePenalty}");
+            Console.WriteLine($"multiplier: {p.multiplier}");
         }
 
 

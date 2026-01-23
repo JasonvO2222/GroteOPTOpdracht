@@ -28,6 +28,8 @@ namespace GroteOPTOpdracht
         private int weightsLength;
         private int[] shiftWeights;
         private int shiftWeightsLength;
+        public float volumePenalty;
+        public float timePenalty;
 
         public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, Parameters p)
         {
@@ -42,6 +44,8 @@ namespace GroteOPTOpdracht
             weightsLength = weights.Length;
             shiftWeights = p.shiftWeights;
             shiftWeightsLength = shiftWeights.Length;
+            volumePenalty = p.volumePenalty;
+            timePenalty = p.timePenalty;
 
 
             if (iterations <= iterationsTConstant)
@@ -81,6 +85,7 @@ namespace GroteOPTOpdracht
 
             float timeDiff;
             float penaltyDiff;
+            float realPenaltyDiff;
 
             int shiftMode;
             int freq;
@@ -104,6 +109,8 @@ namespace GroteOPTOpdracht
                 if (TFlag && iteration_counter % interval == 0) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
                     T = T * T_factor;
+                    volumePenalty *= 1.3f;
+                    timePenalty *= 1.3f;
                     if (T < T_min) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
                     {
                         TFlag = false;
@@ -170,7 +177,7 @@ namespace GroteOPTOpdracht
 
 
 
-                    if (ConsiderSwap(source, cTarget, out sourceTimeDiff, out targetTimeDiff, out timeDiff, out sourceVolumeDiff, out targetVolumeDiff))
+                    if (ConsiderSwap(source, cTarget, out sourceTimeDiff, out targetTimeDiff, out timeDiff, out sourceVolumeDiff, out targetVolumeDiff, out penaltyDiff))
                     {
                         source.dayStop.dayTime += sourceTimeDiff;
                         cTarget.dayStop.dayTime += targetTimeDiff;
@@ -178,6 +185,7 @@ namespace GroteOPTOpdracht
                         cTarget.ofloadStop.volume += targetVolumeDiff;
 
                         oplossing.tijd += timeDiff;
+                        oplossing.penalty += penaltyDiff;
                         oplossing.Swap(source, cTarget);
                         oplossing.SwapStop(source, sourceList, cTarget, targetList);
 
@@ -200,7 +208,7 @@ namespace GroteOPTOpdracht
                     source = sourceList[(int)sourceIndex];
 
                     //stop to add, stop where isnert, timeDiff, list where to add
-                    if (ConsiderAdd(source, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out penaltyDiff))
+                    if (ConsiderAdd(source, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out penaltyDiff, out realPenaltyDiff))
                     {
                         foreach (var v in stopsToAdd)
                         {
@@ -213,6 +221,7 @@ namespace GroteOPTOpdracht
                             timeDiffAdd += timeDiff;
                         }
                         oplossing.penalty += penaltyDiff;
+                        oplossing.realPenalty += realPenaltyDiff;
                         penaltyDiffAdd += penaltyDiff;
                     }
 
@@ -231,7 +240,7 @@ namespace GroteOPTOpdracht
 
                     source = sourceList[(int)sourceIndex];
 
-                    if (ConsiderRemove(source, out penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove))
+                    if (ConsiderRemove(source, out penaltyDiff, out realPenaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove))
                     {
                         foreach (var v in stopsToRemove)
                         {
@@ -247,6 +256,7 @@ namespace GroteOPTOpdracht
                             timeDiffRemove += timeDiff;
                         }
                         oplossing.penalty += penaltyDiff;
+                        oplossing.realPenalty += realPenaltyDiff;
                         penaltyDiffRemove += penaltyDiff;
                     }
                 }
@@ -269,7 +279,7 @@ namespace GroteOPTOpdracht
 
 
 
-                    if (ConsiderShift(source, sourceList, shiftMode, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift))
+                    if (ConsiderShift(source, sourceList, shiftMode, out penaltyDiff, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift))
                     {
                         for (int i = 0; i < freq; i++)
                         {
@@ -284,18 +294,14 @@ namespace GroteOPTOpdracht
 
                             oplossing.tijd += sourceTimeDiff + targetTimeDiff;
                             oplossing.Shift(source, target);
-                            if (HasCircularReference(source)) // nog weghalen
-                            {
-                                Console.WriteLine($"Circular ref created! source: {source.matrixId}, target: {target.matrixId}");
-                                Console.WriteLine($"source.prev: {source.prev?.matrixId}, source.next: {source.next?.matrixId}");
-                                Console.WriteLine($"Shift mode: {shiftMode}, freq: {freq}, iteration: {i}");
-                                throw new Exception("Circular reference detected");
-                            }
                             oplossing.ShiftStop(source, sourceList, targetList);
 
                             timeDiffShift += sourceTimeDiff + targetTimeDiff;
 
                         }
+
+                        oplossing.penalty += penaltyDiff;
+
                     }
                 }
 
@@ -316,26 +322,8 @@ namespace GroteOPTOpdracht
 
         }
 
-        private bool HasCircularReference(Stop start, int maxNodes = 10000) // nog weghalen
-        {
-            HashSet<Stop> visited = new HashSet<Stop>();
-            Stop current = start;
 
-            while (current != null && visited.Count < maxNodes)
-            {
-                if (!visited.Add(current))
-                {
-                    // Found a cycle
-                    Console.WriteLine($"Circular reference detected at stop: {current}");
-                    return true;
-                }
-                current = current.next;
-            }
-
-            return false;
-        }
-
-        private bool ConsiderShift(CollectionStop source, List<CollectionStop> sourceList, int shiftMode, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift)
+        private bool ConsiderShift(CollectionStop source, List<CollectionStop> sourceList, int shiftMode, out float penaltyDiff, out (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[] stopsToShift)
         {
             Stop target;
             List<CollectionStop> targetList;
@@ -346,6 +334,7 @@ namespace GroteOPTOpdracht
             float timeDiff;
             float sourceTimeDiff;
             float targetTimeDiff;
+            penaltyDiff = 0;
 
             stopsToShift = new (CollectionStop, List<CollectionStop>, Stop, List<CollectionStop>, float, float)[source.frequency];
 
@@ -377,14 +366,11 @@ namespace GroteOPTOpdracht
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
 
-                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
-                {
-                    return false;
-                }
-                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
-                {
-                    return false;
-                }
+                //check if adding/removing the node would (exceed)/(take away excess) the dayTimeLimit/cargSpace 
+                penaltyDiff += oplossing.calcTimePenalty(source.dayStop.dayTime, source.dayStop.dayTime + sourceTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcTimePenalty(target.dayStop.dayTime, target.dayStop.dayTime + targetTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(source.ofloadStop.volume, (source.ofloadStop.volume - source.containerCount * source.containerVolume), volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(target.ofloadStop.volume, (target.ofloadStop.volume + source.containerCount * source.containerVolume), volumePenalty);
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
@@ -414,14 +400,12 @@ namespace GroteOPTOpdracht
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
 
-                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
-                {
-                    return false;
-                }
-                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
-                {
-                    return false;
-                }
+                
+                //check if adding/removing the node would (exceed)/(take away excess) the dayTimeLimit/cargSpace 
+                penaltyDiff += oplossing.calcTimePenalty(source.dayStop.dayTime, source.dayStop.dayTime + sourceTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcTimePenalty(target.dayStop.dayTime, target.dayStop.dayTime + targetTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(source.ofloadStop.volume, (source.ofloadStop.volume - source.containerCount * source.containerVolume), volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(target.ofloadStop.volume, (target.ofloadStop.volume + source.containerCount * source.containerVolume), volumePenalty);
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
@@ -456,14 +440,11 @@ namespace GroteOPTOpdracht
                     + source.loadingTime;
                 timeDiff = sourceTimeDiff + targetTimeDiff;
 
-                if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
-                {
-                    return false;
-                }
-                if (source.containerVolume * source.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
-                {
-                    return false;
-                }
+                //check if adding/removing the node would (exceed)/(take away excess) the dayTimeLimit/cargSpace 
+                penaltyDiff += oplossing.calcTimePenalty(source.dayStop.dayTime, source.dayStop.dayTime + sourceTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcTimePenalty(target.dayStop.dayTime, target.dayStop.dayTime + targetTimeDiff, volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(source.ofloadStop.volume, (source.ofloadStop.volume - source.containerCount * source.containerVolume), volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(target.ofloadStop.volume, (target.ofloadStop.volume + source.containerCount * source.containerVolume), volumePenalty);
 
                 stopsToShift[0] = (source, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
             }
@@ -502,14 +483,11 @@ namespace GroteOPTOpdracht
                         + temp.loadingTime;
                     timeDiff += sourceTimeDiff + targetTimeDiff;
 
-                    if (targetTimeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
-                    {
-                        return false;
-                    }
-                    if (temp.containerVolume * temp.containerCount + target.ofloadStop.volume > oplossing.cargoSpace) //check if adding the node would exceed the cargospace
-                    {
-                        return false;
-                    }
+                    //check if adding/removing the node would (exceed)/(take away excess) the dayTimeLimit/cargSpace 
+                    penaltyDiff += oplossing.calcTimePenalty(temp.dayStop.dayTime, temp.dayStop.dayTime + sourceTimeDiff, volumePenalty);
+                    penaltyDiff += oplossing.calcTimePenalty(target.dayStop.dayTime, target.dayStop.dayTime + targetTimeDiff, volumePenalty);
+                    penaltyDiff += oplossing.calcVolumePenalty(temp.ofloadStop.volume, (temp.ofloadStop.volume - temp.containerCount * temp.containerVolume), volumePenalty);
+                    penaltyDiff += oplossing.calcVolumePenalty(target.ofloadStop.volume, (target.ofloadStop.volume + temp.containerCount * temp.containerVolume), volumePenalty);
 
                     stopsToShift[i] = (temp, sourceList, target, targetList, sourceTimeDiff, targetTimeDiff);
                 }
@@ -532,12 +510,13 @@ namespace GroteOPTOpdracht
 
         }
 
-        private bool ConsiderRemove(CollectionStop removeNode, out float penaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove)
+        private bool ConsiderRemove(CollectionStop removeNode, out float penaltyDiff, out float realPenaltyDiff, out (CollectionStop, float, List<CollectionStop>)[] stopsToRemove)
         {
             // calculate difference in duration
             stopsToRemove = new (CollectionStop, float, List<CollectionStop>)[removeNode.frequency]; //stop, timeDiff, penaltyDiff
 
             penaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
+            realPenaltyDiff = 3 * removeNode.frequency * removeNode.loadingTime;
 
             float totalTimeDiff = 0;
             float timeDiff;
@@ -548,6 +527,12 @@ namespace GroteOPTOpdracht
                 timeDiff = -(s.loadingTime + afstandenMatrix[s.prev.matrixId, s.matrixId, 1]
                                                   + afstandenMatrix[s.matrixId, s.next.matrixId, 1]
                                                   - afstandenMatrix[s.prev.matrixId, s.next.matrixId, 1]);
+
+                //check if removing the node would remove excess on the dayTimeLimit and remove penalty
+                penaltyDiff += oplossing.calcTimePenalty(s.dayStop.dayTime, s.dayStop.dayTime + timeDiff, volumePenalty);
+
+                // check if removing the node would remove excess in the cargoSpace and remove penalty accordingly
+                penaltyDiff += oplossing.calcVolumePenalty(s.ofloadStop.volume, (s.ofloadStop.volume -  s.containerCount * s.containerVolume), volumePenalty);
 
                 stopsToRemove[c] = ((s, timeDiff, oplossing.MappingToList(s.dayStop.day, s.dayStop.truckId)));
                 c++;
@@ -570,7 +555,7 @@ namespace GroteOPTOpdracht
         }
 
 
-        private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff)
+        private bool ConsiderAdd(CollectionStop newStop, out (CollectionStop, Stop, float, List<CollectionStop>)[] stopsToAdd, out float penaltyDiff, out float realPenaltyDiff)
         {
             List<CollectionStop> targetList;
             CollectionStop source;
@@ -584,6 +569,7 @@ namespace GroteOPTOpdracht
             float totalTimeDiff = 0;
 
             penaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
+            realPenaltyDiff = -(3 * newStop.frequency * newStop.loadingTime);
 
             // find targets (destinations) for each stop in order that will be added
             if (newStop.frequency == 1)
@@ -691,11 +677,8 @@ namespace GroteOPTOpdracht
             {
                 (source, target, timeDiff, targetList) = stopsToAdd[i];
                 
-                // check if adding this node would exceed the cargoSpace 
-                if ((target.ofloadStop.volume + source.containerCount * source.containerVolume) > oplossing.cargoSpace)
-                {
-                    return false;
-                }
+                // check if adding this node would exceed the cargoSpace and add penalty accordingly
+                penaltyDiff += oplossing.calcVolumePenalty(target.ofloadStop.volume, (target.ofloadStop.volume + source.containerCount * source.containerVolume), volumePenalty);
 
                 timeDiff = source.loadingTime + afstandenMatrix[target.matrixId, source.matrixId, 1]
                                 + afstandenMatrix[source.matrixId, target.next.matrixId, 1]
@@ -703,10 +686,8 @@ namespace GroteOPTOpdracht
                 totalTimeDiff += timeDiff;
                 
 
-                if (timeDiff + target.dayStop.dayTime > oplossing.maxDayTime) //check if adding the node would exceed the dayTimeLimit
-                {
-                    return false;
-                }
+                //check if adding the node would exceed the dayTimeLimit and add penalty
+                penaltyDiff += oplossing.calcTimePenalty(target.dayStop.dayTime, target.dayStop.dayTime + timeDiff, volumePenalty);
 
                 stopsToAdd[i] = (source, target, timeDiff, targetList);
             }
@@ -725,19 +706,20 @@ namespace GroteOPTOpdracht
         }
 
 
-        private bool ConsiderSwap(CollectionStop s1, CollectionStop s2, out float s1Diff, out float s2Diff, out float timeDiff, out int loadDiff1, out int loadDiff2)
+        private bool ConsiderSwap(CollectionStop s1, CollectionStop s2, out float s1Diff, out float s2Diff, out float timeDiff, out int loadDiff1, out int loadDiff2, out float penaltyDiff)
         {
             s1Diff = 0;
             s2Diff = 0;
             timeDiff = 0;
+            penaltyDiff = 0;
 
             if (s1.ofloadStop != s2.ofloadStop) //if both stops are not on the same day before the same ofloadStop
             {
                 loadDiff1 = s2.containerCount * s2.containerVolume - s1.containerVolume * s1.containerCount;
                 loadDiff2 = -loadDiff1;
-                // reject if doesnt fit in cargospace
-                if (s1.ofloadStop.volume + loadDiff1 > oplossing.cargoSpace ||
-                    s2.ofloadStop.volume + loadDiff2 > oplossing.cargoSpace) return false;
+                // add penalty if doesnt fit in cargospace
+                penaltyDiff += oplossing.calcVolumePenalty(s1.ofloadStop.volume, s1.ofloadStop.volume + loadDiff1, volumePenalty);
+                penaltyDiff += oplossing.calcVolumePenalty(s2.ofloadStop.volume, s2.ofloadStop.volume + loadDiff2, volumePenalty);
             }
             else
             {
@@ -782,12 +764,12 @@ namespace GroteOPTOpdracht
                 timeDiff = s1Diff + s2Diff;
             }
 
-            // reject if doesnt fit in dayTime
-            if (s1.dayStop.dayTime + s1Diff > oplossing.maxDayTime ||
-                s2.dayStop.dayTime + s2Diff > oplossing.maxDayTime) return false;
+            // add penalty if doesnt fit in dayTime
+            penaltyDiff += oplossing.calcTimePenalty(s1.dayStop.dayTime, s1.dayStop.dayTime + s1Diff, volumePenalty);
+            penaltyDiff += oplossing.calcTimePenalty(s2.dayStop.dayTime, s2.dayStop.dayTime + s2Diff, volumePenalty);
 
 
-            float scoreDiff = timeDiff;
+            float scoreDiff = timeDiff + penaltyDiff;
 
             if (scoreDiff <= 0) return true; //accept if better and roll chance if not
             else if (RollChance(scoreDiff))
@@ -806,16 +788,21 @@ namespace GroteOPTOpdracht
 
         public double GetScore()
         {
-            return (oplossing.tijd + oplossing.penalty);
+            return (oplossing.tijd + oplossing.realPenalty);
         }
 
         public (double, double) GetScoreDetailed()
         {
-            return (oplossing.tijd, oplossing.penalty);
+            return (oplossing.tijd, oplossing.realPenalty);
         }
         public void OutputSolution()
         {
             oplossing.OutputSolution();
+        }
+
+        public bool Check()
+        {
+            return oplossing.Check();
         }
 
     }

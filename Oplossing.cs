@@ -28,6 +28,7 @@ namespace GroteOPTOpdracht
         public List<CollectionStop> ignore; //stops we dont visit
         public double tijd; 
         public double penalty;
+        public double realPenalty;
         private static readonly Random rnd = new Random();
         public int ofloadingTime = 1800; //time it takes to ofload
         public int cargoSpace = 100000; //liters of space (before compression) a truck can fit
@@ -217,6 +218,8 @@ namespace GroteOPTOpdracht
 
             }
 
+            realPenalty = penalty;
+
         }
 
         // Checks if all stops in the input (from one order) will fit in the randomly chosen days/trucks
@@ -385,48 +388,6 @@ namespace GroteOPTOpdracht
             targetList.Add(source);
         }
 
-        public void OutputSolution(string path = "Resultaat.txt")
-        {
-            StreamWriter sW = new StreamWriter(path);
-            Stop s = leftMostDayStop.next; // get first node
-
-            int counter = 1;
-            int truck = 1;
-            int dagId = 1;
-
-            while (s != null) //iterate over linkedlist
-            {
-                string line = "";
-                if (s is DayStop)
-                {
-                    DayStop r = (DayStop)s;
-                    dagId++;
-                    counter = 1;
-                    if(r.day == 4) {; truck = 2; dagId = 1; } //once the friday DayStop node has passed switch to truck 2
-                }
-
-                else if(s is CollectionStop)
-                {
-                    CollectionStop r = (CollectionStop)s;
-                    line = $"{truck}; {dagId}; {counter}; {r.orderId}";
-                    sW.WriteLine(line);
-                    counter++;
-                }
-
-                else if (s is OfloadStop)
-                {
-                    OfloadStop r = (OfloadStop)s;
-                    line = $"{truck}; {dagId}; {counter}; {0}";
-                    sW.WriteLine(line);
-                    counter++;
-                }
-                s = s.next;
-                Console.WriteLine(line);
-            }
-
-            sW.Close();
-
-        }
 
         // gets random index from stops
         public int? pickRandomStop(List<CollectionStop> dayTruckList)
@@ -530,6 +491,52 @@ namespace GroteOPTOpdracht
             source.ofloadStop = target.ofloadStop;
         }
 
+        public float calcTimePenalty(float before, float after, float multiplier)
+        {
+            float beforeDiff = before - maxDayTime;
+            float afterDiff = after - maxDayTime;
+
+            if (beforeDiff > 0)
+            {
+                if (afterDiff > 0)
+                {
+                    return (afterDiff - beforeDiff) * multiplier;
+                }
+                else
+                {
+                    return -(beforeDiff * multiplier);
+                }
+            }
+            else if (afterDiff > 0)
+            {
+                return afterDiff * multiplier;
+            }
+            return 0;
+        }
+
+        public float calcVolumePenalty(float before, float after, float multiplier)
+        {
+            float beforeDiff = before - cargoSpace;
+            float afterDiff = after - cargoSpace;
+
+            if (beforeDiff > 0)
+            {
+                if (afterDiff > 0)
+                {
+                    return (afterDiff - beforeDiff) * multiplier;
+                }
+                else
+                {
+                    return -(beforeDiff * multiplier);
+                }
+            }
+            else if (afterDiff > 0)
+            {
+                return afterDiff * multiplier;
+            }
+            return 0;
+        }
+
 
         public List<CollectionStop> MappingToList(int day, int truck)
         {
@@ -611,5 +618,72 @@ namespace GroteOPTOpdracht
             return dayStops[((day + 1) + (truck * 5))];
         }
 
+
+        public void OutputSolution(string path = "Resultaat.txt")
+        {
+            StreamWriter sW = new StreamWriter(path);
+            Stop s = leftMostDayStop.next; // get first node
+
+            int counter = 1;
+            int truck = 1;
+            int dagId = 1;
+
+            while (s != null) //iterate over linkedlist
+            {
+                string line = "";
+                if (s is DayStop)
+                {
+                    DayStop r = (DayStop)s;
+                    dagId++;
+                    counter = 1;
+                    if (r.day == 4) {; truck = 2; dagId = 1; } //once the friday DayStop node has passed switch to truck 2
+                }
+
+                else if (s is CollectionStop)
+                {
+                    CollectionStop r = (CollectionStop)s;
+                    line = $"{truck}; {dagId}; {counter}; {r.orderId}";
+                    sW.WriteLine(line);
+                    counter++;
+                }
+
+                else if (s is OfloadStop)
+                {
+                    OfloadStop r = (OfloadStop)s;
+                    line = $"{truck}; {dagId}; {counter}; {0}";
+                    sW.WriteLine(line);
+                    counter++;
+                }
+                s = s.next;
+                Console.WriteLine(line);
+            }
+
+            sW.Close();
+
+        }
+
+        public bool Check()
+        {
+            Stop s = leftMostDayStop.next; // get first node
+
+            while (s != null) //iterate over linkedlist
+            {
+                if (s is DayStop)
+                {
+                    DayStop r = (DayStop)s;
+                    if (r.dayTime > maxDayTime) return false;
+                }
+
+                else if (s is OfloadStop)
+                {
+                    OfloadStop r = (OfloadStop)s;
+                    if (r.volume > cargoSpace) return false;
+                }
+                s = s.next;
+            }
+
+            return true;
+
+        }
     }
 }
