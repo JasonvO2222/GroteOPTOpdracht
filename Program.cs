@@ -18,8 +18,8 @@ namespace GroteOPTOpdracht
         public long iterationsTConstant;
         public int[] weights;
         public int[] shiftWeights;
-        public float volumePenalty;
-        public float timePenalty;
+        public float maxVolumePenalty;
+        public float maxTimePenalty;
         public float multiplier;
 
         public Parameters(int T, int T_min, float T_factor, long iterations, long iterationsTConstant, int[] weights, int[] shiftWeights, float volumePenalty, float timePenalty, float multiplier)
@@ -31,8 +31,8 @@ namespace GroteOPTOpdracht
             this.iterationsTConstant = iterationsTConstant;
             this.weights = weights;
             this.shiftWeights = shiftWeights;
-            this.volumePenalty = volumePenalty;
-            this.timePenalty = timePenalty;
+            this.maxVolumePenalty = volumePenalty;
+            this.maxTimePenalty = timePenalty;
             this.multiplier = multiplier;
         } 
     }
@@ -93,7 +93,7 @@ namespace GroteOPTOpdracht
             double score = 1000000;
             double scoreCheck;
             SimulatedAnnealing sa;
-            Parameters p = new Parameters(770, 1, 0.915f, 50000000, 1000000, createWeightedList(8, 9, 2, 26), createShiftWeights(8, 2, 4), 5, 5, 1.2f);
+            Parameters p = new Parameters(770, 1, 0.915f, 50000000, 1000000, createWeightedList(15, 14, 11, 28), createShiftWeights(19, 13, 3), 25, 15, 2.5f);
             List<CollectionStop> ls = CreateObjectList();
             sa = new SimulatedAnnealing(afstandenMatrix, ls, penalty, p);
             scoreCheck = sa.GetScore();
@@ -112,24 +112,24 @@ namespace GroteOPTOpdracht
 
 
             // run paramatertuning
-            int minutes = 90;
+            int minutes = 300;
             TimeSpan timeLimit = TimeSpan.FromMinutes(minutes);
 
-            int[] Tl = createRange(450, 1050, 6);
-            int[] T_minl = createRange(1, 11, 6);
-            float[] t_factorl = createRange(0.87f, 0.97f, 6);
-            long[] iterationsl = new long[5] { 25000000, 50000000, 100000000, 500000000, 1000000000 };//createRangeLong(5000000, 500000000, 10);
-            long[] iterationsTConstantl = new long[5] { 10000, 100000, 1000000, 50000000, 500000000 };
-            int[] weightadd = createRange(6, 16, 6);
-            int[] weightremove = createRange(6, 16, 6);
-            int[] weightswap = createRange(6, 16, 6);
-            int[] weightshift = createRange(21, 31, 6);
-            int[] weightshift0 = createRange(5, 25, 6);
-            int[] weightshift1 = createRange(1, 21, 6);
-            int[] weightshift2 = createRange(1, 21, 6);
-            float[] volumePenaltyl = createRange(3f, 60f, 10);
-            float[] timePenaltyl = createRange(3f, 30f, 10);
-            float[] multiplierl = createRange(1.005f, 3.2f, 11);
+            int[] Tl = createRange(450, 900, 6);
+            int[] T_minl = createRange(1, 21, 6);
+            float[] t_factorl = createRange(0.75f, 0.95f, 12);
+            long[] iterationsl = new long[8] { 25000000, 50000000, 100000000, 500000000, 500000000, 750000000, 1000000000, 2500000000};
+            long[] iterationsTConstantl = new long[8] { 10000, 100000, 1000000, 2500000, 25000000, 50000000, 75000000, 500000000 };
+            int[] weightadd = createRange(6, 9, 4);
+            int[] weightremove = createRange(5, 7, 3);
+            int[] weightswap = createRange(3, 5, 3);
+            int[] weightshift = createRange(12, 17, 6);
+            int[] weightshift0 = createRange(24, 28, 5);
+            int[] weightshift1 = createRange(8, 12, 3);
+            int[] weightshift2 = createRange(1, 2, 2);
+            float[] volumePenaltyl = createRange(25f, 50f, 11);
+            float[] timePenaltyl = createRange(4f, 8f, 11);
+            float[] multiplierl = createRange(1.005f, 20f, 11);
             long it;
             long itc;
             int t;
@@ -177,7 +177,16 @@ namespace GroteOPTOpdracht
                     Console.WriteLine($"time: {ti}");
                     Console.WriteLine($"penalty: {pen}");
                     DisplayParameters(p);
+                    Console.WriteLine("\n");
 
+                }
+                else if (scoreCheck < score + 6000)
+                {
+                    b = sa.Check();
+                    s = (b) ? "CORRECT" : "invalid";
+                    Console.WriteLine($"{s} result within 100 points of best: ");
+                    DisplayParameters(p);
+                    Console.WriteLine("\n");
                 }
 
             }
@@ -315,8 +324,8 @@ namespace GroteOPTOpdracht
 
             Console.WriteLine($"weights: {ws} (swap), {wa} (add), {wr} (remove), {wsh} (shift)");
             Console.WriteLine($"weights: {s0} (truck), {s1} (day), {s2} (week)");
-            Console.WriteLine($"volumePenalty: {p.volumePenalty}");
-            Console.WriteLine($"timePenalty: {p.timePenalty}");
+            Console.WriteLine($"volumePenalty: {p.maxVolumePenalty}");
+            Console.WriteLine($"timePenalty: {p.maxTimePenalty}");
             Console.WriteLine($"multiplier: {p.multiplier}");
         }
 

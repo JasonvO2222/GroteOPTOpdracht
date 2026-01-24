@@ -28,8 +28,11 @@ namespace GroteOPTOpdracht
         private int weightsLength;
         private int[] shiftWeights;
         private int shiftWeightsLength;
+        public float maxVolumePenalty;
+        public float maxTimePenalty;
         public float volumePenalty;
         public float timePenalty;
+        public float multiplier;
 
         public SimulatedAnnealing(int[,,] matrix, List<CollectionStop> list, float penalty, Parameters p)
         {
@@ -44,8 +47,11 @@ namespace GroteOPTOpdracht
             weightsLength = weights.Length;
             shiftWeights = p.shiftWeights;
             shiftWeightsLength = shiftWeights.Length;
-            volumePenalty = p.volumePenalty;
-            timePenalty = p.timePenalty;
+            maxVolumePenalty = p.maxVolumePenalty;
+            maxTimePenalty = p.maxTimePenalty;
+            multiplier = p.multiplier;
+            volumePenalty = maxVolumePenalty; //(1 / (float)T) * maxVolumePenalty;
+            timePenalty = maxTimePenalty; //(1 / (float)T) * maxTimeePenalty;
 
 
             if (iterations <= iterationsTConstant)
@@ -109,8 +115,8 @@ namespace GroteOPTOpdracht
                 if (TFlag && iteration_counter % interval == 0) // Decrease T every Q iterations by factorizing with a  (only if T is not already on minimum)
                 {
                     T = T * T_factor;
-                    volumePenalty *= 1.3f;
-                    timePenalty *= 1.3f;
+                    volumePenalty *= multiplier; //(1 / ((float)T * multiplier)) * maxVolumePenalty;
+                    timePenalty += multiplier; //(1 / ((float)T * multiplier)) * maxTimePenalty;
                     if (T < T_min) // if T is smaller than minimum: ensure T is not lowered again and set T on minimum
                     {
                         TFlag = false;
@@ -307,19 +313,6 @@ namespace GroteOPTOpdracht
 
                 iteration_counter++;
             }
-
-
-
-
-            Console.WriteLine($"timeDiffAdd: {timeDiffAdd}");
-            Console.WriteLine($"penaltyDiffAdd: {penaltyDiffAdd}");
-            Console.WriteLine($"timeDiffRemove: {timeDiffRemove}");
-            Console.WriteLine($"penaltyDiffRemove: {penaltyDiffRemove}");
-            Console.WriteLine($"timeDiffSwap: {timeDiffSwap}");
-            Console.WriteLine($"timeDiffShift: {timeDiffShift}");
-
-
-
         }
 
 
